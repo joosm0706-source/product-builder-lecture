@@ -425,10 +425,11 @@
       const fov = Math.PI / 3;
       const maxDepth = 900;
       const keys = new Set();
-      const mouse = { locked: false, down: false };
+      const mouse = { locked: false, down: false, dragging: false, lastX: 0 };
       const audio = { ctx: null, enabled: false };
       const particles = [];
       const bullets = [];
+      const spellEffects = [];
       const enemies = [];
       const pickups = [];
       const damageNumbers = [];
@@ -595,7 +596,14 @@
 
         const spread = (Math.random() - .5) * .025;
         const angle = player.angle + spread;
-        bullets.push({ x: player.x, y: player.y, angle, life: .12 });
+        bullets.push({
+          x: player.x + Math.cos(player.angle) * 22,
+          y: player.y + Math.sin(player.angle) * 22,
+          angle,
+          life: .18,
+          maxLife: .18,
+          length: 390
+        });
 
         let best = null;
         let bestScore = Infinity;
@@ -626,6 +634,14 @@
         beep(92, .18, "triangle", .06);
         const hitX = player.x + Math.cos(player.angle) * 110;
         const hitY = player.y + Math.sin(player.angle) * 110;
+        spellEffects.push({
+          x: hitX,
+          y: hitY,
+          life: .55,
+          maxLife: .55,
+          radius: player.spellRadius,
+          angle: player.angle
+        });
         for (let i = 0; i < 34; i++) {
           particles.push({
             x: hitX,
@@ -747,6 +763,7 @@
         });
         enemies.length = 0;
         bullets.length = 0;
+        spellEffects.length = 0;
         particles.length = 0;
         pickups.length = 0;
         damageNumbers.length = 0;
@@ -833,6 +850,10 @@
           bullets[i].life -= dt;
           if (bullets[i].life <= 0) bullets.splice(i, 1);
         }
+        for (let i = spellEffects.length - 1; i >= 0; i--) {
+          spellEffects[i].life -= dt;
+          if (spellEffects[i].life <= 0) spellEffects.splice(i, 1);
+        }
         for (let i = damageNumbers.length - 1; i >= 0; i--) {
           const n = damageNumbers[i];
           n.life -= dt;
@@ -843,17 +864,52 @@
 
       function drawWorld() {
         const sky = ctx.createLinearGradient(0, 0, 0, height * .5);
-        sky.addColorStop(0, "#161a22");
-        sky.addColorStop(.55, "#252027");
-        sky.addColorStop(1, "#403129");
+        sky.addColorStop(0, "#07111f");
+        sky.addColorStop(.42, "#17243a");
+        sky.addColorStop(1, "#55392d");
         ctx.fillStyle = sky;
         ctx.fillRect(0, 0, width, height * .5);
 
+        ctx.save();
+        ctx.globalAlpha = .75;
+        ctx.fillStyle = "#f3df9b";
+        ctx.beginPath();
+        ctx.arc(width * .78, height * .14, Math.max(22, width * .018), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 255, 255, .8)";
+        for (let i = 0; i < 44; i++) {
+          const x = (i * 97 + 31) % width;
+          const y = (i * 53 + 19) % Math.max(1, height * .42);
+          ctx.fillRect(x, y, i % 3 === 0 ? 2 : 1, i % 3 === 0 ? 2 : 1);
+        }
+        ctx.restore();
+
         const floor = ctx.createLinearGradient(0, height * .5, 0, height);
-        floor.addColorStop(0, "#2a241d");
-        floor.addColorStop(1, "#11100e");
+        floor.addColorStop(0, "#4a3827");
+        floor.addColorStop(.5, "#2b241c");
+        floor.addColorStop(1, "#15120f");
         ctx.fillStyle = floor;
         ctx.fillRect(0, height * .5, width, height * .5);
+
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 210, 140, .12)";
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 18; i++) {
+          const t = i / 18;
+          const y = height * .5 + Math.pow(t, 1.9) * height * .5;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(width, y);
+          ctx.stroke();
+        }
+        for (let i = -8; i <= 8; i++) {
+          const horizonX = width * .5 + Math.sin(player.angle + i * .38) * width * .34;
+          ctx.beginPath();
+          ctx.moveTo(horizonX, height * .5);
+          ctx.lineTo(width * .5 + i * width * .16, height);
+          ctx.stroke();
+        }
+        ctx.restore();
 
         const columns = Math.max(180, Math.floor(width / 3));
         const stripW = width / columns + 1;
@@ -866,11 +922,23 @@
           const wallH = Math.min(height * 1.6, (tile * height) / Math.max(1, corrected));
           const y = height / 2 - wallH / 2;
           const fog = Math.max(.18, 1 - corrected / maxDepth);
-          const shade = Math.round(80 * fog * ray.shade + 24);
-          ctx.fillStyle = `rgb(${shade + 28}, ${shade + 16}, ${shade + 6})`;
+          const shade = Math.round(130 * fog * ray.shade + 34);
+          const brick = Math.floor(ray.y / 24) % 2 === 0 ? 10 : -6;
+          ctx.fillStyle = `rgb(${shade + 38 + brick}, ${shade + 22 + brick}, ${shade + 8 + brick})`;
           ctx.fillRect(i * stripW, y, stripW, wallH);
-          ctx.fillStyle = `rgba(255, 216, 140, ${.06 * fog})`;
+          ctx.fillStyle = `rgba(255, 226, 150, ${.16 * fog})`;
           ctx.fillRect(i * stripW, y, 1, wallH);
+          if (i % 8 === 0) {
+            ctx.fillStyle = `rgba(0, 0, 0, ${.14 * fog})`;
+            ctx.fillRect(i * stripW, y, 1.5, wallH);
+          }
+          if (wallH > 60) {
+            ctx.fillStyle = `rgba(0, 0, 0, ${.18 * fog})`;
+            const brickY = y + (Math.floor(ray.x + ray.y) % 32);
+            for (let by = brickY; by < y + wallH; by += 32) {
+              ctx.fillRect(i * stripW, by, stripW, 1);
+            }
+          }
         }
       }
 
@@ -890,6 +958,7 @@
       function drawSprites() {
         const sprites = [
           ...pickups.map(p => ({ ...p, kind: "pickup", scale: .42 })),
+          ...spellEffects.map(s => ({ ...s, kind: "spell", scale: 1.05 })),
           ...particles.map(p => ({ ...p, kind: "particle", scale: .12 })),
           ...enemies.map(e => ({ ...e, kind: "enemy", scale: e.elite ? 1.18 : .96 })),
           ...damageNumbers.map(n => ({ ...n, kind: "number", scale: .1 }))
@@ -900,6 +969,7 @@
           if (!pr) continue;
           if (s.kind === "enemy") drawEnemy(s, pr);
           if (s.kind === "pickup") drawPickup(s, pr);
+          if (s.kind === "spell") drawSpell(s, pr);
           if (s.kind === "particle") drawParticle(s, pr);
           if (s.kind === "number") drawNumber(s, pr);
         }
@@ -938,6 +1008,31 @@
         ctx.restore();
       }
 
+      function drawSpell(s, pr) {
+        const t = 1 - s.life / s.maxLife;
+        const radius = pr.size * (.25 + t * .62);
+        ctx.save();
+        ctx.translate(pr.x, pr.y + pr.size * .12);
+        ctx.globalAlpha = Math.max(0, 1 - t);
+        ctx.strokeStyle = "#7acbff";
+        ctx.lineWidth = Math.max(2, pr.size * .035);
+        ctx.shadowColor = "#68b5ff";
+        ctx.shadowBlur = 24;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = "#ffd37a";
+        ctx.rotate(t * Math.PI * 3);
+        for (let i = 0; i < 6; i++) {
+          ctx.rotate(Math.PI / 3);
+          ctx.beginPath();
+          ctx.moveTo(radius * .35, 0);
+          ctx.lineTo(radius * .92, 0);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
       function drawParticle(p, pr) {
         ctx.globalAlpha = Math.max(0, p.life * 2.5);
         ctx.fillStyle = p.color;
@@ -971,6 +1066,38 @@
         ctx.fillRect(66, 18, 118, 18);
         ctx.fillStyle = "rgba(255, 226, 145, .95)";
         ctx.fillRect(0, 29, 20, 7);
+        ctx.restore();
+      }
+
+      function drawBulletEffects() {
+        ctx.save();
+        ctx.lineCap = "round";
+        for (const b of bullets) {
+          const age = 1 - b.life / b.maxLife;
+          const sway = normalizeAngle(b.angle - player.angle) / (fov / 2);
+          const startX = width * .61;
+          const startY = height * .78;
+          const endX = width * .5 + sway * width * .52;
+          const endY = height * (.48 - age * .18);
+          const grd = ctx.createLinearGradient(startX, startY, endX, endY);
+          grd.addColorStop(0, "rgba(255, 243, 190, .95)");
+          grd.addColorStop(.42, "rgba(255, 189, 76, .8)");
+          grd.addColorStop(1, "rgba(255, 189, 76, 0)");
+          ctx.globalAlpha = Math.max(0, b.life / b.maxLife);
+          ctx.strokeStyle = grd;
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+
+          ctx.fillStyle = "rgba(255, 226, 145, .9)";
+          ctx.shadowColor = "#ffd37a";
+          ctx.shadowBlur = 18;
+          ctx.beginPath();
+          ctx.arc(startX - 10, startY - 44, 10 * (1 - age), 0, Math.PI * 2);
+          ctx.fill();
+        }
         ctx.restore();
       }
 
@@ -1012,6 +1139,7 @@
         if (shake > 0) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
         drawWorld();
         drawSprites();
+        drawBulletEffects();
         drawWeapon();
         drawMinimap();
         if (flash > 0) {
@@ -1065,9 +1193,15 @@
       window.addEventListener("mousemove", e => {
         if (document.pointerLockElement === canvas && running && !pausedForLevel) {
           player.angle = normalizeAngle(player.angle + e.movementX * .0025);
+        } else if (mouse.dragging && running && !pausedForLevel) {
+          const dx = e.clientX - mouse.lastX;
+          player.angle = normalizeAngle(player.angle + dx * .004);
+          mouse.lastX = e.clientX;
         }
       });
       window.addEventListener("mousedown", e => {
+        mouse.dragging = true;
+        mouse.lastX = e.clientX;
         if (e.button === 0) {
           mouse.down = true;
           if (running) shoot();
@@ -1076,6 +1210,11 @@
       });
       window.addEventListener("mouseup", e => {
         if (e.button === 0) mouse.down = false;
+        mouse.dragging = false;
+      });
+      window.addEventListener("mouseleave", () => {
+        mouse.down = false;
+        mouse.dragging = false;
       });
       window.addEventListener("contextmenu", e => e.preventDefault());
       ui.startButton.addEventListener("click", start);
