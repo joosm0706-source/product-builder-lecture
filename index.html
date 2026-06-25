@@ -310,7 +310,7 @@
   </style>
 </head>
 <body>
-  <canvas id="game" aria-label="1인칭 RPG 슈팅게임 화면"></canvas>
+  <canvas id="game" tabindex="0" aria-label="1인칭 RPG 슈팅게임 화면"></canvas>
 
   <div class="hud" aria-hidden="true">
     <div class="topbar">
@@ -436,8 +436,8 @@
 
       const player = {
         x: tile * 2.5,
-        y: tile * 2.5,
-        angle: 0,
+        y: tile * 1.5,
+        angle: .36,
         health: 100,
         maxHealth: 100,
         mana: 60,
@@ -755,7 +755,7 @@
 
       function resetGame() {
         Object.assign(player, {
-          x: tile * 2.5, y: tile * 2.5, angle: 0, health: 100, maxHealth: 100,
+          x: tile * 2.5, y: tile * 1.5, angle: .36, health: 100, maxHealth: 100,
           mana: 60, maxMana: 60, xp: 0, xpNeed: 75, level: 1, wave: 1,
           kills: 0, speed: 185, sprint: 1.55, damage: 28, fireRate: 185,
           lastShot: 0, ammo: 12, maxAmmo: 12, reloadMs: 860, reloading: false,
@@ -862,7 +862,52 @@
         }
       }
 
+      function mapCellAt(x, y) {
+        const mx = Math.floor(x / tile);
+        const my = Math.floor(y / tile);
+        if (mx < 0 || my < 0 || my >= map.length || mx >= map[0].length) return "1";
+        return map[my][mx];
+      }
+
+      function drawFloorTiles(horizon) {
+        const leftRayX = Math.cos(player.angle - fov / 2);
+        const leftRayY = Math.sin(player.angle - fov / 2);
+        const rightRayX = Math.cos(player.angle + fov / 2);
+        const rightRayY = Math.sin(player.angle + fov / 2);
+        const step = Math.max(3, Math.floor(width / 260));
+
+        for (let y = Math.floor(horizon); y < height; y += step) {
+          const depth = (tile * height * .48) / Math.max(1, y - horizon);
+          const fade = Math.max(.18, Math.min(.92, 1 - depth / maxDepth));
+          for (let x = 0; x < width; x += step) {
+            const ratio = x / width;
+            const rayX = leftRayX + (rightRayX - leftRayX) * ratio;
+            const rayY = leftRayY + (rightRayY - leftRayY) * ratio;
+            const wx = player.x + rayX * depth;
+            const wy = player.y + rayY * depth;
+            const cell = mapCellAt(wx, wy);
+            const tx = Math.floor(wx / tile);
+            const ty = Math.floor(wy / tile);
+            const checker = (tx + ty) % 2;
+            const seamX = Math.abs((wx % tile) - tile / 2) > tile * .43;
+            const seamY = Math.abs((wy % tile) - tile / 2) > tile * .43;
+
+            if (cell === "1") {
+              ctx.fillStyle = `rgba(87, 58, 37, ${.45 * fade})`;
+            } else if (seamX || seamY) {
+              ctx.fillStyle = `rgba(232, 178, 98, ${.34 * fade})`;
+            } else {
+              ctx.fillStyle = checker
+                ? `rgba(61, 48, 37, ${.9 * fade})`
+                : `rgba(78, 59, 42, ${.9 * fade})`;
+            }
+            ctx.fillRect(x, y, step + 1, step + 1);
+          }
+        }
+      }
+
       function drawWorld() {
+        const horizon = height * .5;
         const sky = ctx.createLinearGradient(0, 0, 0, height * .5);
         sky.addColorStop(0, "#07111f");
         sky.addColorStop(.42, "#17243a");
@@ -884,12 +929,13 @@
         }
         ctx.restore();
 
-        const floor = ctx.createLinearGradient(0, height * .5, 0, height);
+        const floor = ctx.createLinearGradient(0, horizon, 0, height);
         floor.addColorStop(0, "#4a3827");
         floor.addColorStop(.5, "#2b241c");
         floor.addColorStop(1, "#15120f");
         ctx.fillStyle = floor;
-        ctx.fillRect(0, height * .5, width, height * .5);
+        ctx.fillRect(0, horizon, width, height - horizon);
+        drawFloorTiles(horizon);
 
         ctx.save();
         ctx.strokeStyle = "rgba(255, 210, 140, .12)";
@@ -920,13 +966,13 @@
           const corrected = ray.dist * Math.cos(angle - player.angle);
           wallDists[i] = corrected;
           const wallH = Math.min(height * 1.6, (tile * height) / Math.max(1, corrected));
-          const y = height / 2 - wallH / 2;
+          const y = horizon - wallH / 2;
           const fog = Math.max(.18, 1 - corrected / maxDepth);
-          const shade = Math.round(130 * fog * ray.shade + 34);
+          const shade = Math.round(150 * fog * ray.shade + 42);
           const brick = Math.floor(ray.y / 24) % 2 === 0 ? 10 : -6;
-          ctx.fillStyle = `rgb(${shade + 38 + brick}, ${shade + 22 + brick}, ${shade + 8 + brick})`;
+          ctx.fillStyle = `rgb(${shade + 48 + brick}, ${shade + 35 + brick}, ${shade + 18 + brick})`;
           ctx.fillRect(i * stripW, y, stripW, wallH);
-          ctx.fillStyle = `rgba(255, 226, 150, ${.16 * fog})`;
+          ctx.fillStyle = `rgba(255, 226, 150, ${.24 * fog})`;
           ctx.fillRect(i * stripW, y, 1, wallH);
           if (i % 8 === 0) {
             ctx.fillStyle = `rgba(0, 0, 0, ${.14 * fog})`;
@@ -1174,11 +1220,15 @@
         resetGame();
         running = true;
         ui.startOverlay.hidden = true;
+        canvas.focus();
         canvas.requestPointerLock?.();
       }
 
       window.addEventListener("resize", resize);
       window.addEventListener("keydown", e => {
+        if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyR", "ShiftLeft", "ShiftRight", "Space"].includes(e.code)) {
+          e.preventDefault();
+        }
         keys.add(e.code);
         if (e.code === "KeyR") reload();
         if (e.code === "Escape" && running && !gameOver) {
