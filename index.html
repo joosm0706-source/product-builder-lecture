@@ -322,8 +322,19 @@
       pointer-events: auto;
     }
 
+    .menu-launcher {
+      position: fixed;
+      right: 18px;
+      top: 190px;
+      z-index: 5;
+      pointer-events: auto;
+    }
+
+    .utility-launcher[hidden] { display: none; }
+
     .contact-panel,
-    .comments-panel {
+    .comments-panel,
+    .menu-panel {
       position: fixed;
       right: 18px;
       top: 134px;
@@ -348,15 +359,24 @@
       overflow: auto;
     }
 
+    .menu-panel {
+      top: 242px;
+      width: min(460px, calc(100vw - 28px));
+      max-height: calc(100vh - 260px);
+      overflow: auto;
+    }
+
     .contact-panel.open,
-    .comments-panel.open {
+    .comments-panel.open,
+    .menu-panel.open {
       transform: translateX(0);
       opacity: 1;
       pointer-events: auto;
     }
 
     .contact-head,
-    .comments-head {
+    .comments-head,
+    .menu-head {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
@@ -365,14 +385,16 @@
     }
 
     .contact-head h2,
-    .comments-head h2 {
+    .comments-head h2,
+    .menu-head h2 {
       margin: 0;
       font-size: 20px;
       line-height: 1.2;
     }
 
     .contact-head p,
-    .comments-head p {
+    .comments-head p,
+    .menu-head p {
       margin: 5px 0 0;
       color: var(--muted);
       font-size: 13px;
@@ -454,6 +476,75 @@
       line-height: 1.45;
     }
 
+    .menu-slots {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .menu-slot {
+      min-height: 82px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .14);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, .28);
+      box-shadow: inset 0 0 24px rgba(0, 0, 0, .38);
+    }
+
+    .menu-slot-value {
+      padding: 10px 6px;
+      text-align: center;
+      font-size: clamp(17px, 3vw, 24px);
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .menu-slot.spinning .menu-slot-value {
+      animation: menuSpin .1s linear infinite;
+    }
+
+    @keyframes menuSpin {
+      0% { transform: translateY(-14px); opacity: .45; filter: blur(1px); }
+      50% { transform: translateY(0); opacity: 1; filter: blur(0); }
+      100% { transform: translateY(14px); opacity: .45; filter: blur(1px); }
+    }
+
+    .menu-result {
+      min-height: 74px;
+      margin: 12px 0;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, .1);
+      border-radius: 8px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, .04);
+      line-height: 1.5;
+    }
+
+    .menu-result strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #fff;
+      font-size: 18px;
+    }
+
+    .menu-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .menu-chip {
+      padding: 5px 8px;
+      border: 1px solid rgba(255, 255, 255, .1);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, .04);
+      font-size: 12px;
+    }
+
     @media (max-width: 720px) {
       .hud { padding: 10px; }
       .topbar, .bottombar { align-items: flex-start; }
@@ -469,16 +560,28 @@
         right: 10px;
         top: 122px;
       }
+      .menu-launcher {
+        right: 10px;
+        top: 174px;
+      }
       .contact-panel,
-      .comments-panel {
+      .comments-panel,
+      .menu-panel {
         right: 10px;
       }
       .contact-panel {
-        top: 174px;
+        top: 226px;
       }
       .comments-panel {
-        top: 174px;
-        max-height: calc(100vh - 188px);
+        top: 226px;
+        max-height: calc(100vh - 240px);
+      }
+      .menu-panel {
+        top: 226px;
+        max-height: calc(100vh - 240px);
+      }
+      .menu-slots {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -520,8 +623,9 @@
 
   <div class="damage-flash" id="damageFlash"></div>
 
-  <button class="button contact-launcher" id="contactToggle" type="button" aria-controls="contactPanel" aria-expanded="false">문의하기</button>
-  <button class="button comments-launcher" id="commentsToggle" type="button" aria-controls="commentsPanel" aria-expanded="false">댓글</button>
+  <button class="button contact-launcher utility-launcher" id="contactToggle" type="button" aria-controls="contactPanel" aria-expanded="false">문의하기</button>
+  <button class="button comments-launcher utility-launcher" id="commentsToggle" type="button" aria-controls="commentsPanel" aria-expanded="false">댓글</button>
+  <button class="button menu-launcher utility-launcher" id="menuToggle" type="button" aria-controls="menuPanel" aria-expanded="false">메뉴 추천</button>
 
   <aside class="contact-panel" id="contactPanel" aria-label="광고 및 제휴 문의" aria-hidden="true">
     <div class="contact-head">
@@ -565,6 +669,38 @@
     </div>
   </aside>
 
+  <aside class="menu-panel" id="menuPanel" aria-label="메뉴 추천" aria-hidden="true">
+    <div class="menu-head">
+      <div>
+        <h2>메뉴 추천</h2>
+      <p>먼저 음식 종류를 뽑고, 이어서 해당 종류의 메뉴를 추천합니다.</p>
+      </div>
+      <button class="icon-button" id="menuClose" type="button" aria-label="메뉴 추천 닫기">X</button>
+    </div>
+    <div class="menu-slots">
+      <div class="menu-slot"><div class="menu-slot-value" id="menuCategorySlot">종류 슬롯</div></div>
+      <div class="menu-slot"><div class="menu-slot-value" id="menuDishSlot">메뉴 슬롯</div></div>
+    </div>
+    <div class="actions">
+      <button class="button" id="menuSpinButton" type="button">슬롯 돌리기</button>
+      <button class="button secondary" id="menuQuickButton" type="button">가볍게 추천</button>
+    </div>
+    <div class="menu-result" id="menuResult" aria-live="polite">
+      <strong>오늘 뭐 먹지?</strong>
+      슬롯을 돌리면 음식 종류와 메뉴가 순서대로 결정됩니다.
+    </div>
+    <div class="menu-chips" aria-label="추천 카테고리">
+      <span class="menu-chip">양식</span>
+      <span class="menu-chip">중식</span>
+      <span class="menu-chip">한식</span>
+      <span class="menu-chip">일식</span>
+      <span class="menu-chip">동남아</span>
+      <span class="menu-chip">멕시칸</span>
+      <span class="menu-chip">야식</span>
+      <span class="menu-chip">고기</span>
+    </div>
+  </aside>
+
   <section class="overlay" id="startOverlay">
     <div class="menu">
       <h1>던전 브레이커</h1>
@@ -580,7 +716,6 @@
       <div class="actions">
         <button class="button" id="startButton">게임 시작</button>
         <button class="button secondary" id="muteButton">소리 끄기</button>
-        <a class="button secondary" id="menuRecommendButton" href="menu.html">메뉴 추천</a>
       </div>
     </div>
   </section>
@@ -632,7 +767,6 @@
         pauseMuteButton: document.getElementById("pauseMuteButton"),
         continueButton: document.getElementById("continueButton"),
         mainMenuButton: document.getElementById("mainMenuButton"),
-        menuRecommendButton: document.getElementById("menuRecommendButton"),
         message: document.getElementById("message"),
         messageTitle: document.getElementById("messageTitle"),
         messageText: document.getElementById("messageText"),
@@ -735,6 +869,28 @@
       let shake = 0;
       let flash = 0;
       let wallDists = [];
+
+      const utilityLaunchers = [...document.querySelectorAll(".utility-launcher")];
+      const utilityPanels = [
+        document.getElementById("contactPanel"),
+        document.getElementById("commentsPanel"),
+        document.getElementById("menuPanel")
+      ];
+
+      function closeUtilityPanels() {
+        for (const panel of utilityPanels) {
+          panel?.classList.remove("open");
+          panel?.setAttribute("aria-hidden", "true");
+        }
+        for (const launcher of utilityLaunchers) {
+          launcher.setAttribute("aria-expanded", "false");
+        }
+      }
+
+      function setUtilityButtonsVisible(visible) {
+        for (const launcher of utilityLaunchers) launcher.hidden = !visible;
+        if (!visible) closeUtilityPanels();
+      }
 
       const generalUpgrades = [
         { title: "치명 강화", text: "공격력 +9, 치명타 확률 +5%", apply: () => { player.damageBonus += 9; player.damage += 9; player.crit += .05; } },
@@ -1159,6 +1315,7 @@
         player.mana = player.maxMana;
         pausedForLevel = true;
         document.exitPointerLock?.();
+        setUtilityButtonsVisible(true);
         const shuffled = buildUpgradeChoices();
         ui.choices.innerHTML = "";
         for (const up of shuffled) {
@@ -1169,6 +1326,7 @@
             up.apply();
             ui.levelOverlay.hidden = true;
             pausedForLevel = false;
+            setUtilityButtonsVisible(false);
             nextWave();
             canvas.requestPointerLock?.();
           });
@@ -1217,7 +1375,7 @@
         ui.startOverlay.querySelector("h1").textContent = "전투 종료";
         ui.startOverlay.querySelector("p").textContent = `레벨 ${player.level}, 웨이브 ${player.wave}, 처치 ${player.kills}. 다시 도전하려면 시작하세요.`;
         ui.startButton.textContent = "다시 시작";
-        ui.menuRecommendButton.hidden = false;
+        setUtilityButtonsVisible(true);
       }
 
       function resetGame() {
@@ -1254,7 +1412,7 @@
         ui.startOverlay.querySelector("h1").textContent = "던전 브레이커";
         ui.startOverlay.querySelector("p").textContent = "어둠의 성채를 1인칭으로 돌파하는 RPG 슈팅게임입니다. 적을 처치해 경험치를 얻고, 레벨업마다 전투 스타일을 강화하세요.";
         ui.startButton.textContent = "게임 시작";
-        ui.menuRecommendButton.hidden = false;
+        setUtilityButtonsVisible(true);
       }
 
       function pauseGame() {
@@ -1266,6 +1424,7 @@
         document.exitPointerLock?.();
         ui.startOverlay.hidden = true;
         ui.pauseOverlay.hidden = false;
+        setUtilityButtonsVisible(true);
       }
 
       function resumeGame() {
@@ -1274,6 +1433,7 @@
         running = true;
         last = performance.now();
         ui.pauseOverlay.hidden = true;
+        setUtilityButtonsVisible(false);
         canvas.focus();
         canvas.requestPointerLock?.();
       }
@@ -1809,6 +1969,7 @@
         gameOver = false;
         ui.startOverlay.hidden = true;
         ui.pauseOverlay.hidden = true;
+        setUtilityButtonsVisible(false);
         canvas.focus();
         canvas.requestPointerLock?.();
       }
@@ -1878,6 +2039,7 @@
 
       resize();
       updateSoundButtons();
+      setUtilityButtonsVisible(true);
       draw();
       updateUi();
       requestAnimationFrame(loop);
@@ -1897,9 +2059,14 @@
         if (open) {
           const commentsPanel = document.getElementById("commentsPanel");
           const commentsToggle = document.getElementById("commentsToggle");
+          const menuPanel = document.getElementById("menuPanel");
+          const menuToggle = document.getElementById("menuToggle");
           commentsPanel?.classList.remove("open");
           commentsPanel?.setAttribute("aria-hidden", "true");
           commentsToggle?.setAttribute("aria-expanded", "false");
+          menuPanel?.classList.remove("open");
+          menuPanel?.setAttribute("aria-hidden", "true");
+          menuToggle?.setAttribute("aria-expanded", "false");
         }
         panel.classList.toggle("open", open);
         panel.setAttribute("aria-hidden", String(!open));
@@ -1967,6 +2134,220 @@
     (() => {
       "use strict";
 
+      const categories = [
+        {
+          id: "western",
+          name: "양식",
+          label: "양식 슬롯머신",
+          menus: [
+            { name: "파스타", note: "파스타는 소스만 정하면 취향을 맞추기 쉬운 안정적인 선택입니다." },
+            { name: "스테이크", note: "스테이크는 제대로 든든한 한 끼가 필요할 때 만족도가 높습니다." },
+            { name: "리조또", note: "리조또는 부드럽고 따뜻한 식감이 좋아 천천히 먹기 좋습니다." },
+            { name: "버거", note: "버거는 감자튀김까지 곁들이면 간편하지만 확실하게 배부릅니다." },
+            { name: "피자", note: "피자는 여러 명이 나눠 먹을 때 실패가 적은 메뉴입니다." }
+          ]
+        },
+        {
+          id: "chinese",
+          name: "중식",
+          label: "중식 슬롯머신",
+          menus: [
+            { name: "마라탕", note: "마라탕은 재료를 직접 고를 수 있어 매운맛과 포만감을 동시에 잡습니다." },
+            { name: "짜장면", note: "짜장면은 단짠 소스가 당길 때 가장 빠르게 만족감을 줍니다." },
+            { name: "짬뽕", note: "짬뽕은 얼큰한 국물과 해산물 향이 필요할 때 좋습니다." },
+            { name: "탕수육", note: "탕수육은 바삭한 식감이 있어 사이드가 아니라 메인으로도 충분합니다." },
+            { name: "양꼬치", note: "양꼬치는 향신료와 구운 고기 맛이 당길 때 잘 맞습니다." }
+          ]
+        },
+        {
+          id: "korean",
+          name: "한식",
+          label: "한식 슬롯머신",
+          menus: [
+            { name: "김치찌개", note: "김치찌개는 밥 한 공기와 가장 잘 맞는 뜨끈한 기본기 메뉴입니다." },
+            { name: "비빔밥", note: "비빔밥은 채소와 고추장 맛이 균형 있게 들어가 가볍게 든든합니다." },
+            { name: "제육볶음", note: "제육볶음은 매콤한 고기 반찬이 확실하게 당길 때 좋습니다." },
+            { name: "순두부찌개", note: "순두부찌개는 부드러운 식감과 얼큰한 국물이 같이 필요할 때 맞습니다." },
+            { name: "불고기", note: "불고기는 달큰한 양념 고기라 호불호가 적은 선택입니다." }
+          ]
+        },
+        {
+          id: "japanese",
+          name: "일식",
+          label: "일식 슬롯머신",
+          menus: [
+            { name: "초밥", note: "초밥은 깔끔하고 산뜻한 한 끼가 필요할 때 좋습니다." },
+            { name: "라멘", note: "라멘은 진한 국물과 면이 당기는 날에 잘 맞습니다." },
+            { name: "돈카츠", note: "돈카츠는 바삭한 튀김과 소스 조합으로 만족감이 큽니다." },
+            { name: "규동", note: "규동은 빠르고 든든하게 밥 메뉴를 먹고 싶을 때 좋습니다." },
+            { name: "우동", note: "우동은 부담 없이 따뜻한 국물과 면을 먹고 싶을 때 맞습니다." }
+          ]
+        },
+        {
+          id: "southeast",
+          name: "동남아",
+          label: "동남아 슬롯머신",
+          menus: [
+            { name: "쌀국수", note: "쌀국수는 맑고 따뜻한 국물로 부담 없이 먹기 좋은 메뉴입니다." },
+            { name: "팟타이", note: "팟타이는 새콤달콤한 볶음면이 당길 때 만족도가 높습니다." },
+            { name: "나시고렝", note: "나시고렝은 볶음밥처럼 든든하면서 이국적인 향이 살아 있습니다." },
+            { name: "반미", note: "반미는 바삭한 빵과 고기, 채소가 같이 들어가 가볍게 든든합니다." },
+            { name: "똠얌꿍", note: "똠얌꿍은 새콤하고 얼큰한 국물이 필요할 때 강한 선택입니다." }
+          ]
+        },
+        {
+          id: "mexican",
+          name: "멕시칸",
+          label: "멕시칸 슬롯머신",
+          menus: [
+            { name: "타코", note: "타코는 고기, 소스, 채소를 한입에 먹는 재미가 좋은 메뉴입니다." },
+            { name: "부리토", note: "부리토는 밥과 고기, 콩이 들어가 한 끼로 충분히 든든합니다." },
+            { name: "퀘사디아", note: "퀘사디아는 치즈와 또띠아의 고소함이 당길 때 잘 맞습니다." },
+            { name: "나초", note: "나초는 가볍게 나눠 먹거나 사이드처럼 즐기기 좋습니다." },
+            { name: "파히타", note: "파히타는 구운 고기와 채소를 직접 싸 먹는 맛이 있습니다." }
+          ]
+        },
+        {
+          id: "night",
+          name: "야식",
+          label: "야식 슬롯머신",
+          menus: [
+            { name: "치킨", note: "치킨은 바삭함과 짭짤함이 확실해서 야식 만족도가 높습니다." },
+            { name: "족발", note: "족발은 쫄깃한 식감과 푸짐함이 필요할 때 좋은 야식입니다." },
+            { name: "보쌈", note: "보쌈은 고기와 김치 조합이 깔끔해서 늦은 시간에도 부담이 덜합니다." },
+            { name: "곱창", note: "곱창은 고소한 맛과 구운 향이 강하게 당길 때 추천합니다." },
+            { name: "닭발", note: "닭발은 매운맛과 쫄깃한 식감이 필요한 밤에 잘 맞습니다." }
+          ]
+        },
+        {
+          id: "meat",
+          name: "고기",
+          label: "고기 슬롯머신",
+          menus: [
+            { name: "삼겹살", note: "삼겹살은 구운 고기와 쌈 조합으로 가장 직관적인 만족감을 줍니다." },
+            { name: "갈비", note: "갈비는 달큰한 양념과 고기 육즙이 같이 당길 때 좋습니다." },
+            { name: "닭갈비", note: "닭갈비는 매콤한 양념과 볶음밥 마무리까지 생각하면 강한 선택입니다." },
+            { name: "폭립", note: "폭립은 소스가 진하고 손으로 뜯어 먹는 재미가 있는 메뉴입니다." },
+            { name: "바베큐 플래터", note: "바베큐 플래터는 여러 고기를 한 번에 먹고 싶을 때 좋습니다." }
+          ]
+        }
+      ];
+      const toggle = document.getElementById("menuToggle");
+      const panel = document.getElementById("menuPanel");
+      const close = document.getElementById("menuClose");
+      const categorySlot = document.getElementById("menuCategorySlot");
+      const dishSlot = document.getElementById("menuDishSlot");
+      const slotBoxes = [...panel.querySelectorAll(".menu-slot")];
+      const result = document.getElementById("menuResult");
+      const spinButton = document.getElementById("menuSpinButton");
+      const quickButton = document.getElementById("menuQuickButton");
+      let spinning = false;
+
+      function pick(list) {
+        return list[Math.floor(Math.random() * list.length)];
+      }
+
+      function recommendation() {
+        const category = pick(categories);
+        return { category, menu: pick(category.menus) };
+      }
+
+      function setResult(rec) {
+        result.innerHTML = `<strong>${rec.category.name} - ${rec.menu.name}</strong>${rec.menu.note}`;
+      }
+
+      function quickRecommend() {
+        const rec = recommendation();
+        categorySlot.textContent = rec.category.name;
+        dishSlot.textContent = rec.menu.name;
+        setResult(rec);
+      }
+
+      function spin() {
+        if (spinning) return;
+        spinning = true;
+        spinButton.disabled = true;
+        quickButton.disabled = true;
+        slotBoxes.forEach(slot => slot.classList.add("spinning"));
+
+        const final = recommendation();
+        const categoryTimer = setInterval(() => {
+          categorySlot.textContent = pick(categories).name;
+        }, 70);
+        const dishTimer = setInterval(() => {
+          const currentCategory = categories.find(category => category.name === categorySlot.textContent) || final.category;
+          dishSlot.textContent = pick(currentCategory.menus).name;
+        }, 90);
+
+        setTimeout(() => {
+          clearInterval(categoryTimer);
+          slotBoxes[0].classList.remove("spinning");
+          categorySlot.textContent = final.category.name;
+        }, 950);
+
+        setTimeout(() => {
+          clearInterval(dishTimer);
+          slotBoxes[1].classList.remove("spinning");
+          dishSlot.textContent = final.menu.name;
+          setResult(final);
+          spinning = false;
+          spinButton.disabled = false;
+          quickButton.disabled = false;
+        }, 1550);
+      }
+
+      function setPanel(open) {
+        if (open) {
+          const contactPanel = document.getElementById("contactPanel");
+          const contactToggle = document.getElementById("contactToggle");
+          const commentsPanel = document.getElementById("commentsPanel");
+          const commentsToggle = document.getElementById("commentsToggle");
+          contactPanel?.classList.remove("open");
+          contactPanel?.setAttribute("aria-hidden", "true");
+          contactToggle?.setAttribute("aria-expanded", "false");
+          commentsPanel?.classList.remove("open");
+          commentsPanel?.setAttribute("aria-hidden", "true");
+          commentsToggle?.setAttribute("aria-expanded", "false");
+        }
+        panel.classList.toggle("open", open);
+        panel.setAttribute("aria-hidden", String(!open));
+        toggle.setAttribute("aria-expanded", String(open));
+        if (open) {
+          document.exitPointerLock?.();
+        } else {
+          toggle.focus();
+        }
+      }
+
+      toggle.addEventListener("click", event => {
+        event.stopPropagation();
+        setPanel(!panel.classList.contains("open"));
+      });
+
+      close.addEventListener("click", event => {
+        event.stopPropagation();
+        setPanel(false);
+      });
+
+      spinButton.addEventListener("click", spin);
+      quickButton.addEventListener("click", quickRecommend);
+      panel.addEventListener("mousedown", event => event.stopPropagation());
+      panel.addEventListener("mouseup", event => event.stopPropagation());
+      panel.addEventListener("click", event => event.stopPropagation());
+      panel.addEventListener("contextmenu", event => event.stopPropagation());
+
+      window.addEventListener("keydown", event => {
+        if (event.code === "Escape" && panel.classList.contains("open")) {
+          event.preventDefault();
+          event.stopPropagation();
+          setPanel(false);
+        }
+      }, true);
+    })();
+
+    (() => {
+      "use strict";
+
       const toggle = document.getElementById("commentsToggle");
       const panel = document.getElementById("commentsPanel");
       const close = document.getElementById("commentsClose");
@@ -2000,9 +2381,14 @@
         if (open) {
           const contactPanel = document.getElementById("contactPanel");
           const contactToggle = document.getElementById("contactToggle");
+          const menuPanel = document.getElementById("menuPanel");
+          const menuToggle = document.getElementById("menuToggle");
           contactPanel?.classList.remove("open");
           contactPanel?.setAttribute("aria-hidden", "true");
           contactToggle?.setAttribute("aria-expanded", "false");
+          menuPanel?.classList.remove("open");
+          menuPanel?.setAttribute("aria-hidden", "true");
+          menuToggle?.setAttribute("aria-expanded", "false");
         }
         panel.classList.toggle("open", open);
         panel.setAttribute("aria-hidden", String(!open));
