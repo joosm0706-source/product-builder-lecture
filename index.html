@@ -1,0 +1,1565 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>던전 브레이커 - 1인칭 RPG 슈팅</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101114;
+      --panel: rgba(18, 21, 25, .78);
+      --panel-strong: rgba(18, 21, 25, .92);
+      --line: rgba(255, 255, 255, .14);
+      --text: #f5f0e8;
+      --muted: #b6b2aa;
+      --accent: #ecb04f;
+      --good: #64d596;
+      --bad: #ef5b5b;
+      --mana: #68b5ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      letter-spacing: 0;
+    }
+
+    button, input { font: inherit; }
+
+    #game {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      background: #0d1116;
+      cursor: crosshair;
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: 18px;
+    }
+
+    .topbar,
+    .bottombar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      min-width: 0;
+    }
+
+    .cluster {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+
+    .pill,
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .24);
+      backdrop-filter: blur(14px);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 7px 11px;
+      border-radius: 8px;
+      white-space: nowrap;
+      font-size: 14px;
+    }
+
+    .pill strong { color: #fff; }
+    .stat-good { color: var(--good); }
+    .stat-bad { color: var(--bad); }
+    .stat-mana { color: var(--mana); }
+    .stat-accent { color: var(--accent); }
+
+    .meters {
+      width: min(420px, 48vw);
+      display: grid;
+      gap: 8px;
+    }
+
+    .meter {
+      height: 14px;
+      border: 1px solid rgba(255, 255, 255, .18);
+      background: rgba(0, 0, 0, .34);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .meter > span {
+      display: block;
+      height: 100%;
+      width: 50%;
+      border-radius: inherit;
+      transition: width .14s ease;
+    }
+
+    .meter.health > span { background: linear-gradient(90deg, #d94141, #ff805f); }
+    .meter.mana > span { background: linear-gradient(90deg, #2583d6, #7acbff); }
+    .meter.xp > span { background: linear-gradient(90deg, #d69b25, #ffe18b); }
+
+    .center {
+      align-self: center;
+      justify-self: center;
+      display: grid;
+      place-items: center;
+      width: 70px;
+      height: 70px;
+    }
+
+    .crosshair {
+      position: relative;
+      width: 34px;
+      height: 34px;
+      opacity: .88;
+      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .7));
+    }
+
+    .crosshair::before,
+    .crosshair::after {
+      content: "";
+      position: absolute;
+      background: rgba(255, 245, 214, .92);
+      border-radius: 99px;
+    }
+
+    .crosshair::before {
+      width: 2px;
+      height: 34px;
+      left: 16px;
+    }
+
+    .crosshair::after {
+      width: 34px;
+      height: 2px;
+      top: 16px;
+    }
+
+    .message {
+      position: fixed;
+      left: 50%;
+      top: 22%;
+      transform: translateX(-50%);
+      width: min(620px, calc(100vw - 32px));
+      text-align: center;
+      color: #fff;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, .8);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .2s ease;
+    }
+
+    .message.show { opacity: 1; }
+    .message h1 { margin: 0 0 8px; font-size: clamp(30px, 5vw, 58px); }
+    .message p { margin: 0; color: #efe7d7; font-size: clamp(15px, 2.4vw, 20px); }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background:
+        radial-gradient(circle at 50% 28%, rgba(236, 176, 79, .14), transparent 34%),
+        rgba(5, 7, 9, .78);
+      backdrop-filter: blur(6px);
+      z-index: 3;
+    }
+
+    .overlay[hidden] { display: none; }
+
+    .menu {
+      width: min(760px, 100%);
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: clamp(18px, 4vw, 34px);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .48);
+    }
+
+    .menu h1 {
+      margin: 0 0 8px;
+      font-size: clamp(32px, 6vw, 62px);
+      line-height: 1;
+    }
+
+    .menu p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin: 18px 0 22px;
+    }
+
+    .key {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      min-width: 0;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, .04);
+      font-size: 14px;
+    }
+
+    .key strong { color: var(--text); }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      pointer-events: auto;
+    }
+
+    .button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, .18);
+      border-radius: 8px;
+      min-height: 44px;
+      padding: 10px 15px;
+      color: #17120a;
+      background: linear-gradient(#ffd37a, #e6a53d);
+      box-shadow: 0 10px 24px rgba(236, 176, 79, .24);
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .button.secondary {
+      color: var(--text);
+      background: rgba(255, 255, 255, .06);
+      box-shadow: none;
+    }
+
+    .choices {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 20px;
+      pointer-events: auto;
+    }
+
+    .choice {
+      min-height: 136px;
+      padding: 16px;
+      text-align: left;
+      color: var(--text);
+      background: rgba(255, 255, 255, .055);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .choice:hover,
+    .button:hover {
+      border-color: rgba(255, 211, 122, .75);
+      transform: translateY(-1px);
+    }
+
+    .choice h3 { margin: 0 0 8px; color: #fff; }
+    .choice p { margin: 0; font-size: 14px; }
+
+    .damage-flash {
+      position: fixed;
+      inset: 0;
+      background: rgba(225, 42, 42, .26);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease;
+      z-index: 2;
+    }
+
+    .damage-flash.show { opacity: 1; }
+
+    .contact-launcher {
+      position: fixed;
+      right: 18px;
+      top: 82px;
+      z-index: 5;
+      pointer-events: auto;
+    }
+
+    .contact-panel {
+      position: fixed;
+      right: 18px;
+      top: 134px;
+      z-index: 6;
+      width: min(360px, calc(100vw - 28px));
+      padding: 18px;
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .52);
+      backdrop-filter: blur(16px);
+      transform: translateX(calc(100% + 32px));
+      opacity: 0;
+      pointer-events: none;
+      transition: transform .22s ease, opacity .22s ease;
+    }
+
+    .contact-panel.open {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .contact-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .contact-head h2 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    .contact-head p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .icon-button {
+      appearance: none;
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      color: var(--text);
+      background: rgba(255, 255, 255, .06);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .contact-form {
+      display: grid;
+      gap: 10px;
+    }
+
+    .contact-form label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .contact-form input,
+    .contact-form textarea {
+      width: 100%;
+      min-height: 42px;
+      padding: 10px 11px;
+      color: var(--text);
+      background: rgba(0, 0, 0, .28);
+      border: 1px solid rgba(255, 255, 255, .16);
+      border-radius: 8px;
+      outline: none;
+    }
+
+    .contact-form textarea {
+      min-height: 108px;
+      resize: vertical;
+    }
+
+    .contact-form input:focus,
+    .contact-form textarea:focus,
+    .icon-button:hover {
+      border-color: rgba(255, 211, 122, .75);
+    }
+
+    .contact-status {
+      min-height: 20px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .contact-status.success { color: var(--good); }
+    .contact-status.error { color: var(--bad); }
+
+    @media (max-width: 720px) {
+      .hud { padding: 10px; }
+      .topbar, .bottombar { align-items: flex-start; }
+      .meters { width: min(100%, 48vw); }
+      .pill { font-size: 12px; min-height: 32px; padding: 6px 8px; }
+      .controls, .choices { grid-template-columns: 1fr; }
+      .choice { min-height: 102px; }
+      .contact-launcher {
+        right: 10px;
+        top: 70px;
+      }
+      .contact-panel {
+        right: 10px;
+        top: 122px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" tabindex="0" aria-label="1인칭 RPG 슈팅게임 화면"></canvas>
+
+  <div class="hud" aria-hidden="true">
+    <div class="topbar">
+      <div class="meters">
+        <div class="meter health"><span id="healthBar"></span></div>
+        <div class="meter mana"><span id="manaBar"></span></div>
+        <div class="meter xp"><span id="xpBar"></span></div>
+      </div>
+      <div class="cluster">
+        <span class="pill">레벨 <strong id="levelText">1</strong></span>
+        <span class="pill">웨이브 <strong id="waveText">1</strong></span>
+        <span class="pill">처치 <strong id="killsText">0</strong></span>
+      </div>
+    </div>
+    <div class="center"><div class="crosshair"></div></div>
+    <div class="bottombar">
+      <div class="cluster">
+        <span class="pill">체력 <strong class="stat-bad" id="healthText">100</strong></span>
+        <span class="pill">마나 <strong class="stat-mana" id="manaText">60</strong></span>
+        <span class="pill">탄창 <strong class="stat-accent" id="ammoText">12/12</strong></span>
+      </div>
+      <div class="cluster">
+        <span class="pill">무기 <strong id="weaponText">룬 피스톨</strong></span>
+        <span class="pill">스킬 <strong>우클릭</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="message" id="message">
+    <h1 id="messageTitle"></h1>
+    <p id="messageText"></p>
+  </div>
+
+  <div class="damage-flash" id="damageFlash"></div>
+
+  <button class="button contact-launcher" id="contactToggle" type="button" aria-controls="contactPanel" aria-expanded="false">문의하기</button>
+
+  <aside class="contact-panel" id="contactPanel" aria-label="광고 및 제휴 문의" aria-hidden="true">
+    <div class="contact-head">
+      <div>
+        <h2>광고 및 제휴 문의</h2>
+        <p>광고 집행, 브랜드 협업, 기타 제휴 제안을 보내주세요.</p>
+      </div>
+      <button class="icon-button" id="contactClose" type="button" aria-label="문의 닫기">X</button>
+    </div>
+    <form class="contact-form" id="contactForm" action="https://formspree.io/f/xnjkpbad" method="POST">
+      <label>
+        이름
+        <input name="name" autocomplete="name" required>
+      </label>
+      <label>
+        이메일
+        <input name="email" type="email" autocomplete="email" required>
+      </label>
+      <label>
+        문의 내용
+        <textarea name="message" required placeholder="광고/제휴 목적, 예산, 일정 등을 적어주세요."></textarea>
+      </label>
+      <input type="hidden" name="_subject" value="던전 브레이커 광고 및 제휴 문의">
+      <button class="button" id="contactSubmit" type="submit">문의 보내기</button>
+      <p class="contact-status" id="contactStatus" role="status" aria-live="polite"></p>
+    </form>
+  </aside>
+
+  <section class="overlay" id="startOverlay">
+    <div class="menu">
+      <h1>던전 브레이커</h1>
+      <p>어둠의 성채를 1인칭으로 돌파하는 RPG 슈팅게임입니다. 적을 처치해 경험치를 얻고, 레벨업마다 전투 스타일을 강화하세요.</p>
+      <div class="controls">
+        <div class="key"><strong>WASD</strong><span>이동</span></div>
+        <div class="key"><strong>마우스</strong><span>시점 조작</span></div>
+        <div class="key"><strong>좌클릭</strong><span>사격</span></div>
+        <div class="key"><strong>우클릭</strong><span>마나 폭발</span></div>
+        <div class="key"><strong>R</strong><span>재장전</span></div>
+        <div class="key"><strong>Shift</strong><span>질주</span></div>
+      </div>
+      <div class="actions">
+        <button class="button" id="startButton">게임 시작</button>
+        <button class="button secondary" id="muteButton">소리 켜기</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="overlay" id="levelOverlay" hidden>
+    <div class="menu">
+      <h1>레벨 업</h1>
+      <p>능력 하나를 선택하면 다음 웨이브가 시작됩니다.</p>
+      <div class="choices" id="choices"></div>
+    </div>
+  </section>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d");
+      const ui = {
+        healthBar: document.getElementById("healthBar"),
+        manaBar: document.getElementById("manaBar"),
+        xpBar: document.getElementById("xpBar"),
+        healthText: document.getElementById("healthText"),
+        manaText: document.getElementById("manaText"),
+        ammoText: document.getElementById("ammoText"),
+        levelText: document.getElementById("levelText"),
+        waveText: document.getElementById("waveText"),
+        killsText: document.getElementById("killsText"),
+        weaponText: document.getElementById("weaponText"),
+        startOverlay: document.getElementById("startOverlay"),
+        levelOverlay: document.getElementById("levelOverlay"),
+        choices: document.getElementById("choices"),
+        startButton: document.getElementById("startButton"),
+        muteButton: document.getElementById("muteButton"),
+        message: document.getElementById("message"),
+        messageTitle: document.getElementById("messageTitle"),
+        messageText: document.getElementById("messageText"),
+        damageFlash: document.getElementById("damageFlash")
+      };
+
+      const map = [
+        "1111111111111111111",
+        "1000000000100000001",
+        "1011111010101111101",
+        "1000001010001000001",
+        "1110101011101010111",
+        "1000100000000010001",
+        "1011101110111011101",
+        "1000001000100000001",
+        "1010111011101110101",
+        "1000100000000010001",
+        "1110101110111010111",
+        "1000000010001000001",
+        "1011111010101011101",
+        "1000000000100000001",
+        "1111111111111111111"
+      ];
+
+      const tile = 64;
+      const worldW = map[0].length * tile;
+      const worldH = map.length * tile;
+      const fov = Math.PI / 3;
+      const maxDepth = 900;
+      const keys = new Set();
+      const mouse = { locked: false, down: false, dragging: false, lastX: 0 };
+      const audio = { ctx: null, enabled: false };
+      const particles = [];
+      const bullets = [];
+      const spellEffects = [];
+      const enemies = [];
+      const pickups = [];
+      const damageNumbers = [];
+
+      const player = {
+        x: tile * 2.5,
+        y: tile * 1.5,
+        angle: .36,
+        health: 100,
+        maxHealth: 100,
+        mana: 60,
+        maxMana: 60,
+        xp: 0,
+        xpNeed: 75,
+        level: 1,
+        wave: 1,
+        kills: 0,
+        speed: 185,
+        sprint: 1.55,
+        damage: 28,
+        fireRate: 185,
+        lastShot: 0,
+        ammo: 12,
+        maxAmmo: 12,
+        reloadMs: 860,
+        reloading: false,
+        crit: .08,
+        armor: 0,
+        regen: 4,
+        spellCost: 22,
+        spellDamage: 58,
+        spellRadius: 105
+      };
+
+      let width = 1;
+      let height = 1;
+      let running = false;
+      let pausedForLevel = false;
+      let gameOver = false;
+      let last = performance.now();
+      let messageTimer = 0;
+      let shake = 0;
+      let flash = 0;
+      let wallDists = [];
+
+      const upgrades = [
+        { title: "치명 강화", text: "공격력 +9, 치명타 확률 +5%", apply: () => { player.damage += 9; player.crit += .05; } },
+        { title: "혈기 각성", text: "최대 체력 +25, 즉시 회복 +25", apply: () => { player.maxHealth += 25; player.health = Math.min(player.maxHealth, player.health + 25); } },
+        { title: "비전 탄창", text: "탄창 +4, 재장전 속도 증가", apply: () => { player.maxAmmo += 4; player.ammo = player.maxAmmo; player.reloadMs = Math.max(420, player.reloadMs - 95); } },
+        { title: "민첩한 발걸음", text: "이동 속도 +13%, 마나 재생 +2", apply: () => { player.speed *= 1.13; player.regen += 2; } },
+        { title: "룬 폭발", text: "마나 폭발 피해 +22, 범위 +20", apply: () => { player.spellDamage += 22; player.spellRadius += 20; } },
+        { title: "전투 장갑", text: "받는 피해 감소 +12%, 최대 마나 +15", apply: () => { player.armor += .12; player.maxMana += 15; player.mana = player.maxMana; } }
+      ];
+
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        width = Math.floor(window.innerWidth * dpr);
+        height = Math.floor(window.innerHeight * dpr);
+        canvas.width = width;
+        canvas.height = height;
+        canvas.style.width = "100vw";
+        canvas.style.height = "100vh";
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
+        width = window.innerWidth;
+        height = window.innerHeight;
+      }
+
+      function isWall(x, y) {
+        if (x < 0 || y < 0 || x >= worldW || y >= worldH) return true;
+        const mx = Math.floor(x / tile);
+        const my = Math.floor(y / tile);
+        return map[my][mx] === "1";
+      }
+
+      function canOccupy(x, y, radius) {
+        return !isWall(x, y) &&
+          !isWall(x - radius, y) &&
+          !isWall(x + radius, y) &&
+          !isWall(x, y - radius) &&
+          !isWall(x, y + radius) &&
+          !isWall(x - radius, y - radius) &&
+          !isWall(x + radius, y - radius) &&
+          !isWall(x - radius, y + radius) &&
+          !isWall(x + radius, y + radius);
+      }
+
+      function getOpenSpawnCells(radius) {
+        const cells = [];
+        for (let my = 1; my < map.length - 1; my++) {
+          for (let mx = 1; mx < map[my].length - 1; mx++) {
+            if (map[my][mx] !== "0") continue;
+            const x = (mx + .5) * tile;
+            const y = (my + .5) * tile;
+            if (canOccupy(x, y, radius) && Math.hypot(x - player.x, y - player.y) > tile * 4) {
+              cells.push({ x, y });
+            }
+          }
+        }
+        return cells;
+      }
+
+      function pickSpawnPosition(index, radius) {
+        const cells = getOpenSpawnCells(radius);
+        const fallback = { x: tile * 16.5, y: tile * 13.5 };
+        const base = cells.length ? cells[(index * 7 + player.wave * 5) % cells.length] : fallback;
+        const maxOffset = Math.max(0, tile / 2 - radius - 8);
+
+        for (let tries = 0; tries < 12; tries++) {
+          const angle = Math.random() * Math.PI * 2;
+          const distance = Math.random() * maxOffset;
+          const x = base.x + Math.cos(angle) * distance;
+          const y = base.y + Math.sin(angle) * distance;
+          if (canOccupy(x, y, radius)) return { x, y };
+        }
+        return base;
+      }
+
+      function castRay(angle) {
+        const sin = Math.sin(angle);
+        const cos = Math.cos(angle);
+        let dist = 0;
+        let hitX = player.x;
+        let hitY = player.y;
+        while (dist < maxDepth) {
+          hitX = player.x + cos * dist;
+          hitY = player.y + sin * dist;
+          if (isWall(hitX, hitY)) break;
+          dist += 4;
+        }
+        const shade = ((Math.floor(hitX / tile) + Math.floor(hitY / tile)) % 2) ? .86 : 1;
+        return { dist, shade, x: hitX, y: hitY };
+      }
+
+      function normalizeAngle(a) {
+        while (a < -Math.PI) a += Math.PI * 2;
+        while (a > Math.PI) a -= Math.PI * 2;
+        return a;
+      }
+
+      function lineClear(x1, y1, x2, y2) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 12));
+        for (let i = 1; i <= steps; i++) {
+          const t = i / steps;
+          if (isWall(x1 + dx * t, y1 + dy * t)) return false;
+        }
+        return true;
+      }
+
+      function spawnWave() {
+        enemies.length = 0;
+        const count = 5 + Math.floor(player.wave * 1.7);
+        for (let i = 0; i < count; i++) {
+          const elite = player.wave > 2 && i % 5 === 0;
+          const radius = elite ? 18 : 14;
+          const spawn = pickSpawnPosition(i, radius);
+          enemies.push({
+            x: spawn.x,
+            y: spawn.y,
+            radius,
+            health: elite ? 120 + player.wave * 18 : 58 + player.wave * 12,
+            maxHealth: elite ? 120 + player.wave * 18 : 58 + player.wave * 12,
+            speed: elite ? 70 + player.wave * 2 : 88 + player.wave * 3,
+            damage: elite ? 22 + player.wave * 3 : 12 + player.wave * 2,
+            attackCd: 0,
+            elite,
+            stun: 0
+          });
+        }
+        showMessage(`웨이브 ${player.wave}`, `${count}명의 적이 성채에 나타났습니다.`);
+      }
+
+      function moveEntity(entity, vx, vy, dt) {
+        const nx = entity.x + vx * dt;
+        const ny = entity.y + vy * dt;
+        const r = entity.radius || 12;
+        if (!isWall(nx + Math.sign(vx) * r, entity.y)) entity.x = nx;
+        if (!isWall(entity.x, ny + Math.sign(vy) * r)) entity.y = ny;
+      }
+
+      function movePlayer(vx, vy, dt) {
+        const radius = 15;
+        const nx = player.x + vx * dt;
+        const ny = player.y + vy * dt;
+        if (!isWall(nx + Math.sign(vx) * radius, player.y)) player.x = nx;
+        if (!isWall(player.x, ny + Math.sign(vy) * radius)) player.y = ny;
+      }
+
+      function shoot() {
+        const now = performance.now();
+        if (!running || pausedForLevel || gameOver || player.reloading) return;
+        if (now - player.lastShot < player.fireRate) return;
+        if (player.ammo <= 0) {
+          reload();
+          beep(120, .05, "sawtooth", .04);
+          return;
+        }
+        player.lastShot = now;
+        player.ammo--;
+        shake = Math.max(shake, 5);
+        beep(520 + Math.random() * 80, .055, "square", .045);
+
+        const spread = (Math.random() - .5) * .025;
+        const angle = player.angle + spread;
+        bullets.push({
+          x: player.x + Math.cos(player.angle) * 22,
+          y: player.y + Math.sin(player.angle) * 22,
+          angle,
+          life: .18,
+          maxLife: .18,
+          length: 390
+        });
+
+        let best = null;
+        let bestScore = Infinity;
+        for (const enemy of enemies) {
+          const dx = enemy.x - player.x;
+          const dy = enemy.y - player.y;
+          const dist = Math.hypot(dx, dy);
+          const diff = Math.abs(normalizeAngle(Math.atan2(dy, dx) - angle));
+          const threshold = Math.atan2(enemy.radius + 10, dist);
+          if (diff < threshold && dist < bestScore && lineClear(player.x, player.y, enemy.x, enemy.y)) {
+            best = enemy;
+            bestScore = dist;
+          }
+        }
+
+        if (best) {
+          const crit = Math.random() < player.crit;
+          const dmg = Math.round(player.damage * (crit ? 1.9 : 1) * (1 + player.level * .025));
+          hurtEnemy(best, dmg, crit);
+        }
+      }
+
+      function castSpell() {
+        if (!running || pausedForLevel || gameOver || player.mana < player.spellCost) return;
+        player.mana -= player.spellCost;
+        shake = Math.max(shake, 9);
+        beep(180, .08, "sawtooth", .075);
+        beep(92, .18, "triangle", .06);
+        const hitX = player.x + Math.cos(player.angle) * 110;
+        const hitY = player.y + Math.sin(player.angle) * 110;
+        spellEffects.push({
+          x: hitX,
+          y: hitY,
+          life: .55,
+          maxLife: .55,
+          radius: player.spellRadius,
+          angle: player.angle
+        });
+        for (let i = 0; i < 34; i++) {
+          particles.push({
+            x: hitX,
+            y: hitY,
+            vx: (Math.random() - .5) * 260,
+            vy: (Math.random() - .5) * 260,
+            life: .45,
+            color: Math.random() > .5 ? "#7acbff" : "#ffd37a"
+          });
+        }
+        for (const enemy of [...enemies]) {
+          const d = Math.hypot(enemy.x - hitX, enemy.y - hitY);
+          if (d <= player.spellRadius && lineClear(hitX, hitY, enemy.x, enemy.y)) {
+            enemy.stun = .35;
+            hurtEnemy(enemy, Math.round(player.spellDamage * (1 - d / (player.spellRadius * 1.4))), false);
+          }
+        }
+      }
+
+      function hurtEnemy(enemy, dmg, crit) {
+        enemy.health -= dmg;
+        damageNumbers.push({ x: enemy.x, y: enemy.y, value: dmg, crit, life: .65 });
+        for (let i = 0; i < (crit ? 14 : 7); i++) {
+          particles.push({
+            x: enemy.x,
+            y: enemy.y,
+            vx: (Math.random() - .5) * 120,
+            vy: (Math.random() - .5) * 120,
+            life: .35,
+            color: crit ? "#ffd37a" : "#ef5b5b"
+          });
+        }
+        if (enemy.health <= 0) killEnemy(enemy);
+      }
+
+      function killEnemy(enemy) {
+        const idx = enemies.indexOf(enemy);
+        if (idx >= 0) enemies.splice(idx, 1);
+        player.kills++;
+        player.xp += enemy.elite ? 34 : 18;
+        if (Math.random() < .22) pickups.push({ x: enemy.x, y: enemy.y, type: Math.random() < .55 ? "health" : "mana", radius: 12 });
+        if (player.xp >= player.xpNeed) levelUp();
+        else if (!enemies.length) nextWave();
+      }
+
+      function levelUp() {
+        player.xp -= player.xpNeed;
+        player.xpNeed = Math.round(player.xpNeed * 1.35 + 20);
+        player.level++;
+        player.health = Math.min(player.maxHealth, player.health + 20);
+        player.mana = player.maxMana;
+        pausedForLevel = true;
+        document.exitPointerLock?.();
+        const shuffled = [...upgrades].sort(() => Math.random() - .5).slice(0, 3);
+        ui.choices.innerHTML = "";
+        for (const up of shuffled) {
+          const btn = document.createElement("button");
+          btn.className = "choice";
+          btn.innerHTML = `<h3>${up.title}</h3><p>${up.text}</p>`;
+          btn.addEventListener("click", () => {
+            up.apply();
+            ui.levelOverlay.hidden = true;
+            pausedForLevel = false;
+            nextWave();
+            canvas.requestPointerLock?.();
+          });
+          ui.choices.appendChild(btn);
+        }
+        ui.levelOverlay.hidden = false;
+      }
+
+      function nextWave() {
+        if (pausedForLevel) return;
+        player.wave++;
+        setTimeout(() => {
+          if (running && !gameOver && !pausedForLevel) spawnWave();
+        }, 900);
+      }
+
+      function reload() {
+        if (player.reloading || player.ammo === player.maxAmmo) return;
+        player.reloading = true;
+        ui.ammoText.textContent = "재장전";
+        beep(260, .08, "triangle", .035);
+        setTimeout(() => {
+          player.ammo = player.maxAmmo;
+          player.reloading = false;
+          beep(340, .05, "triangle", .03);
+        }, player.reloadMs);
+      }
+
+      function damagePlayer(amount) {
+        const real = Math.max(1, amount * (1 - Math.min(.65, player.armor)));
+        player.health -= real;
+        flash = .18;
+        ui.damageFlash.classList.add("show");
+        setTimeout(() => ui.damageFlash.classList.remove("show"), 110);
+        beep(95, .08, "sawtooth", .04);
+        if (player.health <= 0) endGame();
+      }
+
+      function endGame() {
+        gameOver = true;
+        running = false;
+        document.exitPointerLock?.();
+        ui.startOverlay.hidden = false;
+        ui.startOverlay.querySelector("h1").textContent = "전투 종료";
+        ui.startOverlay.querySelector("p").textContent = `레벨 ${player.level}, 웨이브 ${player.wave}, 처치 ${player.kills}. 다시 도전하려면 시작하세요.`;
+        ui.startButton.textContent = "다시 시작";
+      }
+
+      function resetGame() {
+        Object.assign(player, {
+          x: tile * 2.5, y: tile * 1.5, angle: .36, health: 100, maxHealth: 100,
+          mana: 60, maxMana: 60, xp: 0, xpNeed: 75, level: 1, wave: 1,
+          kills: 0, speed: 185, sprint: 1.55, damage: 28, fireRate: 185,
+          lastShot: 0, ammo: 12, maxAmmo: 12, reloadMs: 860, reloading: false,
+          crit: .08, armor: 0, regen: 4, spellCost: 22, spellDamage: 58, spellRadius: 105
+        });
+        enemies.length = 0;
+        bullets.length = 0;
+        spellEffects.length = 0;
+        particles.length = 0;
+        pickups.length = 0;
+        damageNumbers.length = 0;
+        gameOver = false;
+        pausedForLevel = false;
+        ui.levelOverlay.hidden = true;
+        spawnWave();
+      }
+
+      function showMessage(title, text) {
+        ui.messageTitle.textContent = title;
+        ui.messageText.textContent = text;
+        ui.message.classList.add("show");
+        messageTimer = 1.7;
+      }
+
+      function beep(freq, duration, type, gain) {
+        if (!audio.enabled) return;
+        if (!audio.ctx) audio.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audio.ctx.createOscillator();
+        const amp = audio.ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        amp.gain.setValueAtTime(gain, audio.ctx.currentTime);
+        amp.gain.exponentialRampToValueAtTime(.001, audio.ctx.currentTime + duration);
+        osc.connect(amp).connect(audio.ctx.destination);
+        osc.start();
+        osc.stop(audio.ctx.currentTime + duration);
+      }
+
+      function update(dt) {
+        if (!running || pausedForLevel || gameOver) return;
+        const forward = (keys.has("KeyW") ? 1 : 0) - (keys.has("KeyS") ? 1 : 0);
+        const strafe = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
+        const sprint = keys.has("ShiftLeft") || keys.has("ShiftRight") ? player.sprint : 1;
+        const len = Math.hypot(forward, strafe) || 1;
+        const moveSpeed = player.speed * sprint;
+        const vx = (Math.cos(player.angle) * forward + Math.cos(player.angle + Math.PI / 2) * strafe) / len * moveSpeed;
+        const vy = (Math.sin(player.angle) * forward + Math.sin(player.angle + Math.PI / 2) * strafe) / len * moveSpeed;
+        movePlayer(vx, vy, dt);
+
+        if (mouse.down) shoot();
+        player.mana = Math.min(player.maxMana, player.mana + player.regen * dt);
+        messageTimer -= dt;
+        if (messageTimer <= 0) ui.message.classList.remove("show");
+        shake = Math.max(0, shake - dt * 18);
+        flash = Math.max(0, flash - dt);
+
+        for (const enemy of enemies) {
+          enemy.attackCd -= dt;
+          enemy.stun = Math.max(0, enemy.stun - dt);
+          const dx = player.x - enemy.x;
+          const dy = player.y - enemy.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 26 && enemy.stun <= 0) {
+            const canSee = lineClear(enemy.x, enemy.y, player.x, player.y);
+            const speed = enemy.speed * (canSee ? 1 : .45);
+            moveEntity(enemy, dx / dist * speed, dy / dist * speed, dt);
+          }
+          if (dist < enemy.radius + 18 && enemy.attackCd <= 0) {
+            enemy.attackCd = enemy.elite ? .72 : .92;
+            damagePlayer(enemy.damage);
+          }
+        }
+
+        for (let i = pickups.length - 1; i >= 0; i--) {
+          const p = pickups[i];
+          if (Math.hypot(player.x - p.x, player.y - p.y) < 28) {
+            if (p.type === "health") player.health = Math.min(player.maxHealth, player.health + 22);
+            else player.mana = Math.min(player.maxMana, player.mana + 24);
+            pickups.splice(i, 1);
+            beep(p.type === "health" ? 420 : 610, .06, "triangle", .04);
+          }
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.life -= dt;
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          if (p.life <= 0) particles.splice(i, 1);
+        }
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          bullets[i].life -= dt;
+          if (bullets[i].life <= 0) bullets.splice(i, 1);
+        }
+        for (let i = spellEffects.length - 1; i >= 0; i--) {
+          spellEffects[i].life -= dt;
+          if (spellEffects[i].life <= 0) spellEffects.splice(i, 1);
+        }
+        for (let i = damageNumbers.length - 1; i >= 0; i--) {
+          const n = damageNumbers[i];
+          n.life -= dt;
+          n.y -= dt * 28;
+          if (n.life <= 0) damageNumbers.splice(i, 1);
+        }
+      }
+
+      function mapCellAt(x, y) {
+        const mx = Math.floor(x / tile);
+        const my = Math.floor(y / tile);
+        if (mx < 0 || my < 0 || my >= map.length || mx >= map[0].length) return "1";
+        return map[my][mx];
+      }
+
+      function drawFloorTiles(horizon) {
+        const leftRayX = Math.cos(player.angle - fov / 2);
+        const leftRayY = Math.sin(player.angle - fov / 2);
+        const rightRayX = Math.cos(player.angle + fov / 2);
+        const rightRayY = Math.sin(player.angle + fov / 2);
+        const step = Math.max(3, Math.floor(width / 260));
+
+        for (let y = Math.floor(horizon); y < height; y += step) {
+          const depth = (tile * height * .48) / Math.max(1, y - horizon);
+          const fade = Math.max(.18, Math.min(.92, 1 - depth / maxDepth));
+          for (let x = 0; x < width; x += step) {
+            const ratio = x / width;
+            const rayX = leftRayX + (rightRayX - leftRayX) * ratio;
+            const rayY = leftRayY + (rightRayY - leftRayY) * ratio;
+            const wx = player.x + rayX * depth;
+            const wy = player.y + rayY * depth;
+            const cell = mapCellAt(wx, wy);
+            const tx = Math.floor(wx / tile);
+            const ty = Math.floor(wy / tile);
+            const checker = (tx + ty) % 2;
+            const seamX = Math.abs((wx % tile) - tile / 2) > tile * .43;
+            const seamY = Math.abs((wy % tile) - tile / 2) > tile * .43;
+
+            if (cell === "1") {
+              ctx.fillStyle = `rgba(87, 58, 37, ${.45 * fade})`;
+            } else if (seamX || seamY) {
+              ctx.fillStyle = `rgba(232, 178, 98, ${.34 * fade})`;
+            } else {
+              ctx.fillStyle = checker
+                ? `rgba(61, 48, 37, ${.9 * fade})`
+                : `rgba(78, 59, 42, ${.9 * fade})`;
+            }
+            ctx.fillRect(x, y, step + 1, step + 1);
+          }
+        }
+      }
+
+      function drawWorld() {
+        const horizon = height * .5;
+        const sky = ctx.createLinearGradient(0, 0, 0, height * .5);
+        sky.addColorStop(0, "#07111f");
+        sky.addColorStop(.42, "#17243a");
+        sky.addColorStop(1, "#55392d");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, width, height * .5);
+
+        ctx.save();
+        ctx.globalAlpha = .75;
+        ctx.fillStyle = "#f3df9b";
+        ctx.beginPath();
+        ctx.arc(width * .78, height * .14, Math.max(22, width * .018), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 255, 255, .8)";
+        for (let i = 0; i < 44; i++) {
+          const x = (i * 97 + 31) % width;
+          const y = (i * 53 + 19) % Math.max(1, height * .42);
+          ctx.fillRect(x, y, i % 3 === 0 ? 2 : 1, i % 3 === 0 ? 2 : 1);
+        }
+        ctx.restore();
+
+        const floor = ctx.createLinearGradient(0, horizon, 0, height);
+        floor.addColorStop(0, "#4a3827");
+        floor.addColorStop(.5, "#2b241c");
+        floor.addColorStop(1, "#15120f");
+        ctx.fillStyle = floor;
+        ctx.fillRect(0, horizon, width, height - horizon);
+        drawFloorTiles(horizon);
+
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 210, 140, .12)";
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 18; i++) {
+          const t = i / 18;
+          const y = height * .5 + Math.pow(t, 1.9) * height * .5;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(width, y);
+          ctx.stroke();
+        }
+        for (let i = -8; i <= 8; i++) {
+          const horizonX = width * .5 + Math.sin(player.angle + i * .38) * width * .34;
+          ctx.beginPath();
+          ctx.moveTo(horizonX, height * .5);
+          ctx.lineTo(width * .5 + i * width * .16, height);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        const columns = Math.max(180, Math.floor(width / 3));
+        const stripW = width / columns + 1;
+        wallDists = new Array(columns);
+        for (let i = 0; i < columns; i++) {
+          const angle = player.angle - fov / 2 + (i / columns) * fov;
+          const ray = castRay(angle);
+          const corrected = ray.dist * Math.cos(angle - player.angle);
+          wallDists[i] = corrected;
+          const wallH = Math.min(height * 1.6, (tile * height) / Math.max(1, corrected));
+          const y = horizon - wallH / 2;
+          const fog = Math.max(.18, 1 - corrected / maxDepth);
+          const shade = Math.round(150 * fog * ray.shade + 42);
+          const brick = Math.floor(ray.y / 24) % 2 === 0 ? 10 : -6;
+          ctx.fillStyle = `rgb(${shade + 48 + brick}, ${shade + 35 + brick}, ${shade + 18 + brick})`;
+          ctx.fillRect(i * stripW, y, stripW, wallH);
+          ctx.fillStyle = `rgba(255, 226, 150, ${.24 * fog})`;
+          ctx.fillRect(i * stripW, y, 1, wallH);
+          if (i % 8 === 0) {
+            ctx.fillStyle = `rgba(0, 0, 0, ${.14 * fog})`;
+            ctx.fillRect(i * stripW, y, 1.5, wallH);
+          }
+          if (wallH > 60) {
+            ctx.fillStyle = `rgba(0, 0, 0, ${.18 * fog})`;
+            const brickY = y + (Math.floor(ray.x + ray.y) % 32);
+            for (let by = brickY; by < y + wallH; by += 32) {
+              ctx.fillRect(i * stripW, by, stripW, 1);
+            }
+          }
+        }
+      }
+
+      function projectSprite(obj) {
+        const dx = obj.x - player.x;
+        const dy = obj.y - player.y;
+        const dist = Math.hypot(dx, dy);
+        const angle = normalizeAngle(Math.atan2(dy, dx) - player.angle);
+        if (Math.abs(angle) > fov * .72 || dist < 5) return null;
+        const screenX = (angle / (fov / 2) * .5 + .5) * width;
+        const size = Math.min(height, (tile * height) / dist * (obj.scale || 1));
+        const column = Math.floor(screenX / width * wallDists.length);
+        if (wallDists[column] && dist > wallDists[column] + 20) return null;
+        return { x: screenX, y: height / 2, size, dist };
+      }
+
+      function drawSprites() {
+        const sprites = [
+          ...pickups.map(p => ({ ...p, kind: "pickup", scale: .42 })),
+          ...spellEffects.map(s => ({ ...s, kind: "spell", scale: 1.05 })),
+          ...particles.map(p => ({ ...p, kind: "particle", scale: .12 })),
+          ...enemies.map(e => ({ ...e, kind: "enemy", scale: e.elite ? 1.18 : .96 })),
+          ...damageNumbers.map(n => ({ ...n, kind: "number", scale: .1 }))
+        ].sort((a, b) => Math.hypot(b.x - player.x, b.y - player.y) - Math.hypot(a.x - player.x, a.y - player.y));
+
+        for (const s of sprites) {
+          const pr = projectSprite(s);
+          if (!pr) continue;
+          if (s.kind === "enemy") drawEnemy(s, pr);
+          if (s.kind === "pickup") drawPickup(s, pr);
+          if (s.kind === "spell") drawSpell(s, pr);
+          if (s.kind === "particle") drawParticle(s, pr);
+          if (s.kind === "number") drawNumber(s, pr);
+        }
+      }
+
+      function drawEnemy(enemy, pr) {
+        const w = pr.size * .48;
+        const h = pr.size * .86;
+        const x = pr.x - w / 2;
+        const y = pr.y - h / 2 + pr.size * .12;
+        const grd = ctx.createLinearGradient(x, y, x, y + h);
+        grd.addColorStop(0, enemy.elite ? "#8d4cff" : "#d14b4b");
+        grd.addColorStop(1, enemy.elite ? "#2b173f" : "#351516");
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, Math.max(4, w * .18));
+        ctx.fill();
+        ctx.fillStyle = "#ffe3a0";
+        ctx.fillRect(x + w * .22, y + h * .22, w * .16, Math.max(2, h * .035));
+        ctx.fillRect(x + w * .62, y + h * .22, w * .16, Math.max(2, h * .035));
+        ctx.fillStyle = "rgba(0, 0, 0, .55)";
+        ctx.fillRect(x, y - 10, w, 5);
+        ctx.fillStyle = enemy.elite ? "#c99bff" : "#ff6d63";
+        ctx.fillRect(x, y - 10, w * Math.max(0, enemy.health / enemy.maxHealth), 5);
+      }
+
+      function drawPickup(p, pr) {
+        ctx.save();
+        ctx.translate(pr.x, pr.y + pr.size * .18);
+        ctx.fillStyle = p.type === "health" ? "#64d596" : "#68b5ff";
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 16;
+        ctx.beginPath();
+        ctx.arc(0, 0, Math.max(7, pr.size * .22), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawSpell(s, pr) {
+        const t = 1 - s.life / s.maxLife;
+        const radius = pr.size * (.25 + t * .62);
+        ctx.save();
+        ctx.translate(pr.x, pr.y + pr.size * .12);
+        ctx.globalAlpha = Math.max(0, 1 - t);
+        ctx.strokeStyle = "#7acbff";
+        ctx.lineWidth = Math.max(2, pr.size * .035);
+        ctx.shadowColor = "#68b5ff";
+        ctx.shadowBlur = 24;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = "#ffd37a";
+        ctx.rotate(t * Math.PI * 3);
+        for (let i = 0; i < 6; i++) {
+          ctx.rotate(Math.PI / 3);
+          ctx.beginPath();
+          ctx.moveTo(radius * .35, 0);
+          ctx.lineTo(radius * .92, 0);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawParticle(p, pr) {
+        ctx.globalAlpha = Math.max(0, p.life * 2.5);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(pr.x - 2, pr.y - 2, 4, 4);
+        ctx.globalAlpha = 1;
+      }
+
+      function drawNumber(n, pr) {
+        ctx.globalAlpha = Math.max(0, n.life * 1.5);
+        ctx.fillStyle = n.crit ? "#ffd37a" : "#fff1e0";
+        ctx.font = `${Math.max(14, pr.size * 1.8)}px Segoe UI, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText(n.value, pr.x, pr.y - pr.size * 4);
+        ctx.globalAlpha = 1;
+      }
+
+      function drawWeapon() {
+        const bob = Math.sin(performance.now() / 110) * (keys.size ? 4 : 1);
+        const x = width * .62;
+        const y = height - 112 + bob;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(-.08);
+        ctx.fillStyle = "#201914";
+        ctx.fillRect(20, 34, 154, 40);
+        ctx.fillStyle = "#553b27";
+        ctx.fillRect(86, 65, 42, 74);
+        ctx.fillStyle = "#cf9a45";
+        ctx.fillRect(2, 24, 92, 24);
+        ctx.fillStyle = "#755237";
+        ctx.fillRect(66, 18, 118, 18);
+        ctx.fillStyle = "rgba(255, 226, 145, .95)";
+        ctx.fillRect(0, 29, 20, 7);
+        ctx.restore();
+      }
+
+      function drawBulletEffects() {
+        ctx.save();
+        ctx.lineCap = "round";
+        for (const b of bullets) {
+          const age = 1 - b.life / b.maxLife;
+          const sway = normalizeAngle(b.angle - player.angle) / (fov / 2);
+          const startX = width * .61;
+          const startY = height * .78;
+          const endX = width * .5 + sway * width * .52;
+          const endY = height * (.48 - age * .18);
+          const grd = ctx.createLinearGradient(startX, startY, endX, endY);
+          grd.addColorStop(0, "rgba(255, 243, 190, .95)");
+          grd.addColorStop(.42, "rgba(255, 189, 76, .8)");
+          grd.addColorStop(1, "rgba(255, 189, 76, 0)");
+          ctx.globalAlpha = Math.max(0, b.life / b.maxLife);
+          ctx.strokeStyle = grd;
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+
+          ctx.fillStyle = "rgba(255, 226, 145, .9)";
+          ctx.shadowColor = "#ffd37a";
+          ctx.shadowBlur = 18;
+          ctx.beginPath();
+          ctx.arc(startX - 10, startY - 44, 10 * (1 - age), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function drawMinimap() {
+        const size = 142;
+        const scale = size / Math.max(worldW, worldH);
+        const x = 18;
+        const y = height - size - 78;
+        ctx.save();
+        ctx.globalAlpha = .88;
+        ctx.fillStyle = "rgba(18, 21, 25, .74)";
+        ctx.fillRect(x, y, size, size);
+        ctx.strokeStyle = "rgba(255, 255, 255, .16)";
+        ctx.strokeRect(x, y, size, size);
+        for (let my = 0; my < map.length; my++) {
+          for (let mx = 0; mx < map[0].length; mx++) {
+            if (map[my][mx] === "1") {
+              ctx.fillStyle = "rgba(236, 176, 79, .55)";
+              ctx.fillRect(x + mx * tile * scale, y + my * tile * scale, tile * scale, tile * scale);
+            }
+          }
+        }
+        ctx.fillStyle = "#ef5b5b";
+        for (const e of enemies) ctx.fillRect(x + e.x * scale - 2, y + e.y * scale - 2, 4, 4);
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(x + player.x * scale, y + player.y * scale, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.beginPath();
+        ctx.moveTo(x + player.x * scale, y + player.y * scale);
+        ctx.lineTo(x + (player.x + Math.cos(player.angle) * 38) * scale, y + (player.y + Math.sin(player.angle) * 38) * scale);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function draw() {
+        ctx.save();
+        if (shake > 0) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
+        drawWorld();
+        drawSprites();
+        drawBulletEffects();
+        drawWeapon();
+        drawMinimap();
+        if (flash > 0) {
+          ctx.fillStyle = `rgba(190, 30, 30, ${flash * .7})`;
+          ctx.fillRect(0, 0, width, height);
+        }
+        ctx.restore();
+      }
+
+      function updateUi() {
+        ui.healthBar.style.width = `${Math.max(0, player.health / player.maxHealth * 100)}%`;
+        ui.manaBar.style.width = `${Math.max(0, player.mana / player.maxMana * 100)}%`;
+        ui.xpBar.style.width = `${Math.max(0, player.xp / player.xpNeed * 100)}%`;
+        ui.healthText.textContent = `${Math.max(0, Math.ceil(player.health))}/${player.maxHealth}`;
+        ui.manaText.textContent = `${Math.floor(player.mana)}/${player.maxMana}`;
+        ui.ammoText.textContent = player.reloading ? "재장전" : `${player.ammo}/${player.maxAmmo}`;
+        ui.levelText.textContent = player.level;
+        ui.waveText.textContent = player.wave;
+        ui.killsText.textContent = player.kills;
+      }
+
+      function loop(now) {
+        const dt = Math.min(.05, (now - last) / 1000);
+        last = now;
+        update(dt);
+        draw();
+        updateUi();
+        requestAnimationFrame(loop);
+      }
+
+      function start() {
+        resetGame();
+        running = true;
+        ui.startOverlay.hidden = true;
+        canvas.focus();
+        canvas.requestPointerLock?.();
+      }
+
+      window.addEventListener("resize", resize);
+      window.addEventListener("keydown", e => {
+        if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyR", "ShiftLeft", "ShiftRight", "Space"].includes(e.code)) {
+          e.preventDefault();
+        }
+        keys.add(e.code);
+        if (e.code === "KeyR") reload();
+        if (e.code === "Escape" && running && !gameOver) {
+          ui.startOverlay.hidden = false;
+          running = false;
+          document.exitPointerLock?.();
+          ui.startOverlay.querySelector("h1").textContent = "일시 정지";
+          ui.startOverlay.querySelector("p").textContent = "게임 시작을 누르면 현재 전투가 새로 시작됩니다.";
+        }
+      });
+      window.addEventListener("keyup", e => keys.delete(e.code));
+      window.addEventListener("mousemove", e => {
+        if (document.pointerLockElement === canvas && running && !pausedForLevel) {
+          player.angle = normalizeAngle(player.angle + e.movementX * .0025);
+        } else if (mouse.dragging && running && !pausedForLevel) {
+          const dx = e.clientX - mouse.lastX;
+          player.angle = normalizeAngle(player.angle + dx * .004);
+          mouse.lastX = e.clientX;
+        }
+      });
+      window.addEventListener("mousedown", e => {
+        mouse.dragging = true;
+        mouse.lastX = e.clientX;
+        if (e.button === 0) {
+          mouse.down = true;
+          if (running) shoot();
+        }
+        if (e.button === 2) castSpell();
+      });
+      window.addEventListener("mouseup", e => {
+        if (e.button === 0) mouse.down = false;
+        mouse.dragging = false;
+      });
+      window.addEventListener("mouseleave", () => {
+        mouse.down = false;
+        mouse.dragging = false;
+      });
+      window.addEventListener("contextmenu", e => e.preventDefault());
+      ui.startButton.addEventListener("click", start);
+      ui.muteButton.addEventListener("click", () => {
+        audio.enabled = !audio.enabled;
+        ui.muteButton.textContent = audio.enabled ? "소리 끄기" : "소리 켜기";
+        if (audio.enabled) beep(440, .08, "triangle", .04);
+      });
+      canvas.addEventListener("click", () => {
+        if (running && !pausedForLevel) canvas.requestPointerLock?.();
+      });
+
+      if (!CanvasRenderingContext2D.prototype.roundRect) {
+        CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+          const rr = Math.min(r, w / 2, h / 2);
+          this.beginPath();
+          this.moveTo(x + rr, y);
+          this.arcTo(x + w, y, x + w, y + h, rr);
+          this.arcTo(x + w, y + h, x, y + h, rr);
+          this.arcTo(x, y + h, x, y, rr);
+          this.arcTo(x, y, x + w, y, rr);
+          this.closePath();
+          return this;
+        };
+      }
+
+      resize();
+      draw();
+      updateUi();
+      requestAnimationFrame(loop);
+    })();
+
+    (() => {
+      "use strict";
+
+      const toggle = document.getElementById("contactToggle");
+      const panel = document.getElementById("contactPanel");
+      const close = document.getElementById("contactClose");
+      const form = document.getElementById("contactForm");
+      const submit = document.getElementById("contactSubmit");
+      const status = document.getElementById("contactStatus");
+
+      function setPanel(open) {
+        panel.classList.toggle("open", open);
+        panel.setAttribute("aria-hidden", String(!open));
+        toggle.setAttribute("aria-expanded", String(open));
+        if (open) {
+          document.exitPointerLock?.();
+          form.querySelector("input, textarea")?.focus();
+        } else {
+          toggle.focus();
+        }
+      }
+
+      function setStatus(message, type = "") {
+        status.textContent = message;
+        status.className = `contact-status ${type}`.trim();
+      }
+
+      toggle.addEventListener("click", event => {
+        event.stopPropagation();
+        setPanel(!panel.classList.contains("open"));
+      });
+
+      close.addEventListener("click", event => {
+        event.stopPropagation();
+        setPanel(false);
+      });
+
+      panel.addEventListener("mousedown", event => event.stopPropagation());
+      panel.addEventListener("mouseup", event => event.stopPropagation());
+      panel.addEventListener("click", event => event.stopPropagation());
+      panel.addEventListener("contextmenu", event => event.stopPropagation());
+
+      window.addEventListener("keydown", event => {
+        if (event.code === "Escape" && panel.classList.contains("open")) {
+          event.preventDefault();
+          event.stopPropagation();
+          setPanel(false);
+        }
+      }, true);
+
+      form.addEventListener("submit", async event => {
+        event.preventDefault();
+        submit.disabled = true;
+        setStatus("전송 중입니다.");
+
+        try {
+          const response = await fetch(form.action, {
+            method: "POST",
+            body: new FormData(form),
+            headers: { Accept: "application/json" }
+          });
+
+          if (!response.ok) throw new Error("Formspree request failed");
+
+          form.reset();
+          setStatus("문의가 전송되었습니다.", "success");
+        } catch (error) {
+          setStatus("전송에 실패했습니다. 잠시 후 다시 시도해주세요.", "error");
+        } finally {
+          submit.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
