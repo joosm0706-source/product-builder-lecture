@@ -545,6 +545,87 @@
       font-size: 12px;
     }
 
+    .touch-controls {
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      display: none;
+    }
+
+    .touch-controls.active {
+      display: block;
+    }
+
+    .touch-zone {
+      position: absolute;
+      inset-block: 0;
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    .move-zone {
+      left: 0;
+      width: 44vw;
+    }
+
+    .look-zone {
+      right: 0;
+      width: 56vw;
+    }
+
+    .stick-base {
+      position: absolute;
+      left: 28px;
+      bottom: 34px;
+      width: 122px;
+      height: 122px;
+      border: 1px solid rgba(255, 255, 255, .2);
+      border-radius: 50%;
+      background: rgba(0, 0, 0, .24);
+      box-shadow: inset 0 0 24px rgba(0, 0, 0, .35);
+      pointer-events: none;
+    }
+
+    .stick-thumb {
+      position: absolute;
+      left: 37px;
+      top: 37px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(255, 211, 122, .76);
+      box-shadow: 0 8px 18px rgba(0, 0, 0, .35);
+    }
+
+    .touch-actions {
+      position: absolute;
+      right: 18px;
+      bottom: 24px;
+      display: grid;
+      grid-template-columns: repeat(2, 58px);
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .touch-button {
+      appearance: none;
+      width: 58px;
+      height: 58px;
+      border: 1px solid rgba(255, 255, 255, .22);
+      border-radius: 50%;
+      color: #17120a;
+      background: linear-gradient(#ffd37a, #e6a53d);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, .35);
+      font-weight: 900;
+      touch-action: manipulation;
+    }
+
+    .touch-button.secondary {
+      color: var(--text);
+      background: rgba(255, 255, 255, .11);
+    }
+
     @media (max-width: 720px) {
       .hud { padding: 10px; }
       .topbar, .bottombar { align-items: flex-start; }
@@ -582,6 +663,12 @@
       }
       .menu-slots {
         grid-template-columns: 1fr;
+      }
+      .touch-controls {
+        display: block;
+      }
+      .touch-controls:not(.active) {
+        display: none;
       }
     }
   </style>
@@ -622,6 +709,19 @@
   </div>
 
   <div class="damage-flash" id="damageFlash"></div>
+
+  <div class="touch-controls" id="touchControls" aria-hidden="true">
+    <div class="touch-zone move-zone" id="moveZone">
+      <div class="stick-base" id="stickBase"><div class="stick-thumb" id="stickThumb"></div></div>
+    </div>
+    <div class="touch-zone look-zone" id="lookZone"></div>
+    <div class="touch-actions">
+      <button class="touch-button" id="touchShoot" type="button">발사</button>
+      <button class="touch-button secondary" id="touchSkill" type="button">스킬</button>
+      <button class="touch-button secondary" id="touchReload" type="button">장전</button>
+      <button class="touch-button secondary" id="touchPause" type="button">정지</button>
+    </div>
+  </div>
 
   <button class="button contact-launcher utility-launcher" id="contactToggle" type="button" aria-controls="contactPanel" aria-expanded="false">문의하기</button>
   <button class="button comments-launcher utility-launcher" id="commentsToggle" type="button" aria-controls="commentsPanel" aria-expanded="false">댓글</button>
@@ -673,7 +773,7 @@
     <div class="menu-head">
       <div>
         <h2>메뉴 추천</h2>
-      <p>먼저 음식 종류를 뽑고, 이어서 해당 종류의 메뉴를 추천합니다.</p>
+      <p>음식 카테고리를 먼저 뽑고, 결정된 카테고리 안에서 메뉴를 추천합니다.</p>
       </div>
       <button class="icon-button" id="menuClose" type="button" aria-label="메뉴 추천 닫기">X</button>
     </div>
@@ -687,7 +787,7 @@
     </div>
     <div class="menu-result" id="menuResult" aria-live="polite">
       <strong>오늘 뭐 먹지?</strong>
-      슬롯을 돌리면 음식 종류와 메뉴가 순서대로 결정됩니다.
+      1. 음식 카테고리 선택 2. 해당 카테고리 메뉴 선택 3. 간단한 추천 멘트로 마무리합니다.
     </div>
     <div class="menu-chips" aria-label="추천 카테고리">
       <span class="menu-chip">양식</span>
@@ -798,6 +898,16 @@
       const maxDepth = 900;
       const keys = new Set();
       const mouse = { locked: false, down: false, dragging: false, lastX: 0 };
+      const touch = {
+        moveId: null,
+        lookId: null,
+        moveX: 0,
+        moveY: 0,
+        baseX: 0,
+        baseY: 0,
+        lookLastX: 0,
+        shootDown: false
+      };
       const audio = { ctx: null, enabled: true };
       const particles = [];
       const bullets = [];
@@ -890,6 +1000,23 @@
       function setUtilityButtonsVisible(visible) {
         for (const launcher of utilityLaunchers) launcher.hidden = !visible;
         if (!visible) closeUtilityPanels();
+      }
+
+      function setTouchControlsVisible(visible) {
+        document.getElementById("touchControls")?.classList.toggle("active", visible);
+        if (!visible) {
+          touch.moveId = null;
+          touch.lookId = null;
+          touch.moveX = 0;
+          touch.moveY = 0;
+          touch.shootDown = false;
+          updateStick(0, 0);
+        }
+      }
+
+      function updateStick(x, y) {
+        const thumb = document.getElementById("stickThumb");
+        if (thumb) thumb.style.transform = `translate(${x * 37}px, ${y * 37}px)`;
       }
 
       const generalUpgrades = [
@@ -1376,6 +1503,7 @@
         ui.startOverlay.querySelector("p").textContent = `레벨 ${player.level}, 웨이브 ${player.wave}, 처치 ${player.kills}. 다시 도전하려면 시작하세요.`;
         ui.startButton.textContent = "다시 시작";
         setUtilityButtonsVisible(true);
+        setTouchControlsVisible(false);
       }
 
       function resetGame() {
@@ -1413,6 +1541,7 @@
         ui.startOverlay.querySelector("p").textContent = "어둠의 성채를 1인칭으로 돌파하는 RPG 슈팅게임입니다. 적을 처치해 경험치를 얻고, 레벨업마다 전투 스타일을 강화하세요.";
         ui.startButton.textContent = "게임 시작";
         setUtilityButtonsVisible(true);
+        setTouchControlsVisible(false);
       }
 
       function pauseGame() {
@@ -1425,6 +1554,7 @@
         ui.startOverlay.hidden = true;
         ui.pauseOverlay.hidden = false;
         setUtilityButtonsVisible(true);
+        setTouchControlsVisible(false);
       }
 
       function resumeGame() {
@@ -1434,6 +1564,7 @@
         last = performance.now();
         ui.pauseOverlay.hidden = true;
         setUtilityButtonsVisible(false);
+        setTouchControlsVisible(true);
         canvas.focus();
         canvas.requestPointerLock?.();
       }
@@ -1481,14 +1612,18 @@
         if (!running || pausedForLevel || gameOver) return;
         const forward = (keys.has("KeyW") ? 1 : 0) - (keys.has("KeyS") ? 1 : 0);
         const strafe = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
+        const touchForward = -touch.moveY;
+        const touchStrafe = touch.moveX;
+        const totalForward = Math.max(-1, Math.min(1, forward + touchForward));
+        const totalStrafe = Math.max(-1, Math.min(1, strafe + touchStrafe));
         const sprint = keys.has("ShiftLeft") || keys.has("ShiftRight") ? player.sprint : 1;
-        const len = Math.hypot(forward, strafe) || 1;
+        const len = Math.hypot(totalForward, totalStrafe) || 1;
         const moveSpeed = player.speed * sprint;
-        const vx = (Math.cos(player.angle) * forward + Math.cos(player.angle + Math.PI / 2) * strafe) / len * moveSpeed;
-        const vy = (Math.sin(player.angle) * forward + Math.sin(player.angle + Math.PI / 2) * strafe) / len * moveSpeed;
+        const vx = (Math.cos(player.angle) * totalForward + Math.cos(player.angle + Math.PI / 2) * totalStrafe) / len * moveSpeed;
+        const vy = (Math.sin(player.angle) * totalForward + Math.sin(player.angle + Math.PI / 2) * totalStrafe) / len * moveSpeed;
         movePlayer(vx, vy, dt);
 
-        if (mouse.down) shoot();
+        if (mouse.down || touch.shootDown) shoot();
         player.secondaryCooldown = Math.max(0, player.secondaryCooldown - dt);
         player.mana = Math.min(player.maxMana, player.mana + player.regen * dt);
         messageTimer -= dt;
@@ -1970,6 +2105,7 @@
         ui.startOverlay.hidden = true;
         ui.pauseOverlay.hidden = true;
         setUtilityButtonsVisible(false);
+        setTouchControlsVisible(true);
         canvas.focus();
         canvas.requestPointerLock?.();
       }
@@ -2023,6 +2159,79 @@
         if (running && !pausedForLevel) canvas.requestPointerLock?.();
       });
 
+      const moveZone = document.getElementById("moveZone");
+      const lookZone = document.getElementById("lookZone");
+      const touchShoot = document.getElementById("touchShoot");
+      const touchSkill = document.getElementById("touchSkill");
+      const touchReload = document.getElementById("touchReload");
+      const touchPause = document.getElementById("touchPause");
+
+      moveZone.addEventListener("pointerdown", event => {
+        if (!running || pausedForLevel || touch.moveId !== null) return;
+        touch.moveId = event.pointerId;
+        touch.baseX = event.clientX;
+        touch.baseY = event.clientY;
+        moveZone.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      });
+
+      moveZone.addEventListener("pointermove", event => {
+        if (event.pointerId !== touch.moveId) return;
+        const max = 54;
+        const dx = Math.max(-max, Math.min(max, event.clientX - touch.baseX));
+        const dy = Math.max(-max, Math.min(max, event.clientY - touch.baseY));
+        touch.moveX = dx / max;
+        touch.moveY = dy / max;
+        updateStick(touch.moveX, touch.moveY);
+        event.preventDefault();
+      });
+
+      function clearMovePointer(event) {
+        if (event.pointerId !== touch.moveId) return;
+        touch.moveId = null;
+        touch.moveX = 0;
+        touch.moveY = 0;
+        updateStick(0, 0);
+      }
+
+      moveZone.addEventListener("pointerup", clearMovePointer);
+      moveZone.addEventListener("pointercancel", clearMovePointer);
+
+      lookZone.addEventListener("pointerdown", event => {
+        if (!running || pausedForLevel || touch.lookId !== null) return;
+        touch.lookId = event.pointerId;
+        touch.lookLastX = event.clientX;
+        lookZone.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      });
+
+      lookZone.addEventListener("pointermove", event => {
+        if (event.pointerId !== touch.lookId || !running || pausedForLevel) return;
+        const dx = event.clientX - touch.lookLastX;
+        player.angle = normalizeAngle(player.angle + dx * .0042);
+        touch.lookLastX = event.clientX;
+        event.preventDefault();
+      });
+
+      function clearLookPointer(event) {
+        if (event.pointerId !== touch.lookId) return;
+        touch.lookId = null;
+      }
+
+      lookZone.addEventListener("pointerup", clearLookPointer);
+      lookZone.addEventListener("pointercancel", clearLookPointer);
+
+      touchShoot.addEventListener("pointerdown", event => {
+        touch.shootDown = true;
+        shoot();
+        event.preventDefault();
+      });
+      touchShoot.addEventListener("pointerup", () => { touch.shootDown = false; });
+      touchShoot.addEventListener("pointercancel", () => { touch.shootDown = false; });
+      touchSkill.addEventListener("click", () => castSpell());
+      touchReload.addEventListener("click", () => reload());
+      touchPause.addEventListener("click", () => pauseGame());
+
       if (!CanvasRenderingContext2D.prototype.roundRect) {
         CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
           const rr = Math.min(r, w / 2, h / 2);
@@ -2040,6 +2249,7 @@
       resize();
       updateSoundButtons();
       setUtilityButtonsVisible(true);
+      setTouchControlsVisible(false);
       draw();
       updateUi();
       requestAnimationFrame(loop);
@@ -2253,7 +2463,7 @@
       }
 
       function setResult(rec) {
-        result.innerHTML = `<strong>${rec.category.name} - ${rec.menu.name}</strong>${rec.menu.note}`;
+        result.innerHTML = `<strong>${rec.menu.name}</strong>${rec.category.name} 중에서는 ${rec.menu.name}. ${rec.menu.note}`;
       }
 
       function quickRecommend() {
@@ -2268,32 +2478,39 @@
         spinning = true;
         spinButton.disabled = true;
         quickButton.disabled = true;
-        slotBoxes.forEach(slot => slot.classList.add("spinning"));
 
         const final = recommendation();
+        categorySlot.textContent = "종류 선택 중";
+        dishSlot.textContent = "대기 중";
+        result.innerHTML = "<strong>카테고리 선택 중</strong>먼저 음식 종류를 고르는 중입니다.";
+        slotBoxes[0].classList.add("spinning");
+
         const categoryTimer = setInterval(() => {
           categorySlot.textContent = pick(categories).name;
         }, 70);
-        const dishTimer = setInterval(() => {
-          const currentCategory = categories.find(category => category.name === categorySlot.textContent) || final.category;
-          dishSlot.textContent = pick(currentCategory.menus).name;
-        }, 90);
 
         setTimeout(() => {
           clearInterval(categoryTimer);
           slotBoxes[0].classList.remove("spinning");
           categorySlot.textContent = final.category.name;
-        }, 950);
+          dishSlot.textContent = "메뉴 선택 중";
+          result.innerHTML = `<strong>${final.category.name} 결정</strong>이제 ${final.category.name} 메뉴를 고르는 중입니다.`;
+          slotBoxes[1].classList.add("spinning");
 
-        setTimeout(() => {
-          clearInterval(dishTimer);
-          slotBoxes[1].classList.remove("spinning");
-          dishSlot.textContent = final.menu.name;
-          setResult(final);
-          spinning = false;
-          spinButton.disabled = false;
-          quickButton.disabled = false;
-        }, 1550);
+          const dishTimer = setInterval(() => {
+            dishSlot.textContent = pick(final.category.menus).name;
+          }, 85);
+
+          setTimeout(() => {
+            clearInterval(dishTimer);
+            slotBoxes[1].classList.remove("spinning");
+            dishSlot.textContent = final.menu.name;
+            setResult(final);
+            spinning = false;
+            spinButton.disabled = false;
+            quickButton.disabled = false;
+          }, 850);
+        }, 900);
       }
 
       function setPanel(open) {
