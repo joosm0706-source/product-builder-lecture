@@ -307,7 +307,16 @@
       pointer-events: auto;
     }
 
-    .contact-panel {
+    .comments-launcher {
+      position: fixed;
+      right: 18px;
+      top: 136px;
+      z-index: 5;
+      pointer-events: auto;
+    }
+
+    .contact-panel,
+    .comments-panel {
       position: fixed;
       right: 18px;
       top: 134px;
@@ -325,13 +334,22 @@
       transition: transform .22s ease, opacity .22s ease;
     }
 
-    .contact-panel.open {
+    .comments-panel {
+      top: 188px;
+      width: min(520px, calc(100vw - 28px));
+      max-height: calc(100vh - 206px);
+      overflow: auto;
+    }
+
+    .contact-panel.open,
+    .comments-panel.open {
       transform: translateX(0);
       opacity: 1;
       pointer-events: auto;
     }
 
-    .contact-head {
+    .contact-head,
+    .comments-head {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
@@ -339,13 +357,15 @@
       margin-bottom: 14px;
     }
 
-    .contact-head h2 {
+    .contact-head h2,
+    .comments-head h2 {
       margin: 0;
       font-size: 20px;
       line-height: 1.2;
     }
 
-    .contact-head p {
+    .contact-head p,
+    .comments-head p {
       margin: 5px 0 0;
       color: var(--muted);
       font-size: 13px;
@@ -412,6 +432,21 @@
     .contact-status.success { color: var(--good); }
     .contact-status.error { color: var(--bad); }
 
+    .comments-frame {
+      min-height: 260px;
+      padding: 12px;
+      background: rgba(255, 255, 255, .04);
+      border: 1px solid rgba(255, 255, 255, .1);
+      border-radius: 8px;
+    }
+
+    .comments-loading {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
     @media (max-width: 720px) {
       .hud { padding: 10px; }
       .topbar, .bottombar { align-items: flex-start; }
@@ -423,9 +458,20 @@
         right: 10px;
         top: 70px;
       }
-      .contact-panel {
+      .comments-launcher {
         right: 10px;
         top: 122px;
+      }
+      .contact-panel,
+      .comments-panel {
+        right: 10px;
+      }
+      .contact-panel {
+        top: 174px;
+      }
+      .comments-panel {
+        top: 174px;
+        max-height: calc(100vh - 188px);
       }
     }
   </style>
@@ -468,6 +514,7 @@
   <div class="damage-flash" id="damageFlash"></div>
 
   <button class="button contact-launcher" id="contactToggle" type="button" aria-controls="contactPanel" aria-expanded="false">문의하기</button>
+  <button class="button comments-launcher" id="commentsToggle" type="button" aria-controls="commentsPanel" aria-expanded="false">댓글</button>
 
   <aside class="contact-panel" id="contactPanel" aria-label="광고 및 제휴 문의" aria-hidden="true">
     <div class="contact-head">
@@ -494,6 +541,21 @@
       <button class="button" id="contactSubmit" type="submit">문의 보내기</button>
       <p class="contact-status" id="contactStatus" role="status" aria-live="polite"></p>
     </form>
+  </aside>
+
+  <aside class="comments-panel" id="commentsPanel" aria-label="댓글" aria-hidden="true">
+    <div class="comments-head">
+      <div>
+        <h2>댓글</h2>
+        <p>게임에 대한 의견과 피드백을 남겨주세요.</p>
+      </div>
+      <button class="icon-button" id="commentsClose" type="button" aria-label="댓글 닫기">X</button>
+    </div>
+    <div class="comments-frame">
+      <p class="comments-loading" id="commentsLoading">댓글 버튼을 누르면 Disqus 댓글이 표시됩니다.</p>
+      <div id="disqus_thread"></div>
+      <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    </div>
   </aside>
 
   <section class="overlay" id="startOverlay">
@@ -1498,6 +1560,13 @@
       const status = document.getElementById("contactStatus");
 
       function setPanel(open) {
+        if (open) {
+          const commentsPanel = document.getElementById("commentsPanel");
+          const commentsToggle = document.getElementById("commentsToggle");
+          commentsPanel?.classList.remove("open");
+          commentsPanel?.setAttribute("aria-hidden", "true");
+          commentsToggle?.setAttribute("aria-expanded", "false");
+        }
         panel.classList.toggle("open", open);
         panel.setAttribute("aria-hidden", String(!open));
         toggle.setAttribute("aria-expanded", String(open));
@@ -1559,6 +1628,81 @@
           submit.disabled = false;
         }
       });
+    })();
+
+    (() => {
+      "use strict";
+
+      const toggle = document.getElementById("commentsToggle");
+      const panel = document.getElementById("commentsPanel");
+      const close = document.getElementById("commentsClose");
+      const loading = document.getElementById("commentsLoading");
+      let loaded = false;
+
+      function loadDisqus() {
+        if (loaded) return;
+        loaded = true;
+        loading.textContent = "댓글을 불러오는 중입니다.";
+
+        window.disqus_config = function() {
+          this.page.url = window.location.href.split("#")[0];
+          this.page.identifier = "dungeon-breaker";
+        };
+
+        const script = document.createElement("script");
+        script.src = "https://productbulider-3.disqus.com/embed.js";
+        script.setAttribute("data-timestamp", String(+new Date()));
+        script.onload = () => {
+          loading.hidden = true;
+        };
+        script.onerror = () => {
+          loading.textContent = "댓글을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.";
+          loaded = false;
+        };
+        (document.head || document.body).appendChild(script);
+      }
+
+      function setPanel(open) {
+        if (open) {
+          const contactPanel = document.getElementById("contactPanel");
+          const contactToggle = document.getElementById("contactToggle");
+          contactPanel?.classList.remove("open");
+          contactPanel?.setAttribute("aria-hidden", "true");
+          contactToggle?.setAttribute("aria-expanded", "false");
+        }
+        panel.classList.toggle("open", open);
+        panel.setAttribute("aria-hidden", String(!open));
+        toggle.setAttribute("aria-expanded", String(open));
+        if (open) {
+          document.exitPointerLock?.();
+          loadDisqus();
+        } else {
+          toggle.focus();
+        }
+      }
+
+      toggle.addEventListener("click", event => {
+        event.stopPropagation();
+        setPanel(!panel.classList.contains("open"));
+      });
+
+      close.addEventListener("click", event => {
+        event.stopPropagation();
+        setPanel(false);
+      });
+
+      panel.addEventListener("mousedown", event => event.stopPropagation());
+      panel.addEventListener("mouseup", event => event.stopPropagation());
+      panel.addEventListener("click", event => event.stopPropagation());
+      panel.addEventListener("contextmenu", event => event.stopPropagation());
+
+      window.addEventListener("keydown", event => {
+        if (event.code === "Escape" && panel.classList.contains("open")) {
+          event.preventDefault();
+          event.stopPropagation();
+          setPanel(false);
+        }
+      }, true);
     })();
   </script>
 </body>
