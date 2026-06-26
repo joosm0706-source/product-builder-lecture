@@ -242,6 +242,9 @@
 
     .button {
       appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       border: 1px solid rgba(255, 255, 255, .18);
       border-radius: 8px;
       min-height: 44px;
@@ -251,6 +254,7 @@
       box-shadow: 0 10px 24px rgba(236, 176, 79, .24);
       font-weight: 700;
       cursor: pointer;
+      text-decoration: none;
     }
 
     .button.secondary {
@@ -501,7 +505,7 @@
       </div>
       <div class="cluster">
         <span class="pill">무기 <strong id="weaponText">룬 피스톨</strong></span>
-        <span class="pill">스킬 <strong>우클릭</strong></span>
+        <span class="pill">스킬 <strong id="skillText">마나 폭발</strong></span>
       </div>
     </div>
   </div>
@@ -573,6 +577,9 @@
       <div class="actions">
         <button class="button" id="startButton">게임 시작</button>
         <button class="button secondary" id="muteButton">소리 켜기</button>
+        <a class="button secondary" id="menuRecommendButton" href="https://www.google.com/search?q=%EB%A9%94%EB%89%B4+%EC%B6%94%EC%B2%9C" target="_blank" rel="noopener">메뉴 추천</a>
+        <button class="button" id="continueButton" type="button" hidden>계속하기</button>
+        <button class="button secondary" id="mainMenuButton" type="button" hidden>시작메뉴로가기</button>
       </div>
     </div>
   </section>
@@ -602,11 +609,15 @@
         waveText: document.getElementById("waveText"),
         killsText: document.getElementById("killsText"),
         weaponText: document.getElementById("weaponText"),
+        skillText: document.getElementById("skillText"),
         startOverlay: document.getElementById("startOverlay"),
         levelOverlay: document.getElementById("levelOverlay"),
         choices: document.getElementById("choices"),
         startButton: document.getElementById("startButton"),
         muteButton: document.getElementById("muteButton"),
+        continueButton: document.getElementById("continueButton"),
+        mainMenuButton: document.getElementById("mainMenuButton"),
+        menuRecommendButton: document.getElementById("menuRecommendButton"),
         message: document.getElementById("message"),
         messageTitle: document.getElementById("messageTitle"),
         messageText: document.getElementById("messageText"),
@@ -654,6 +665,11 @@
         machinegun: { name: "룬 머신건", damage: 17, fireRate: 82, ammo: 32, reloadMs: 1320, pellets: 1, spread: .055, shake: 4, pitch: 610 },
         rifle: { name: "성기사 라이플", damage: 54, fireRate: 360, ammo: 7, reloadMs: 1180, pellets: 1, spread: .008, shake: 7, pitch: 430 }
       };
+      const secondarySkills = {
+        blast: { name: "마나 폭발" },
+        grenade: { name: "수류탄" },
+        dash: { name: "대쉬" }
+      };
 
       const player = {
         x: tile * 2.5,
@@ -671,7 +687,13 @@
         speed: 125,
         sprint: 1.32,
         weapon: "pistol",
+        weaponChanged: false,
         damageBonus: 0,
+        weaponLevel: 0,
+        secondarySkill: "blast",
+        secondaryChanged: false,
+        secondaryLevel: 0,
+        secondaryCooldown: 0,
         damage: 28,
         fireRate: 185,
         lastShot: 0,
@@ -690,6 +712,7 @@
       let width = 1;
       let height = 1;
       let running = false;
+      let paused = false;
       let pausedForLevel = false;
       let gameOver = false;
       let last = performance.now();
@@ -698,21 +721,70 @@
       let flash = 0;
       let wallDists = [];
 
-      const upgrades = [
+      const generalUpgrades = [
         { title: "치명 강화", text: "공격력 +9, 치명타 확률 +5%", apply: () => { player.damageBonus += 9; player.damage += 9; player.crit += .05; } },
         { title: "혈기 각성", text: "최대 체력 +25, 즉시 회복 +25", apply: () => { player.maxHealth += 25; player.health = Math.min(player.maxHealth, player.health + 25); } },
         { title: "비전 탄창", text: "탄창 +4, 재장전 속도 증가", apply: () => { player.maxAmmo += 4; player.ammo = player.maxAmmo; player.reloadMs = Math.max(420, player.reloadMs - 95); } },
         { title: "민첩한 발걸음", text: "이동 속도 +8%, 마나 재생 +2", apply: () => { player.speed *= 1.08; player.regen += 2; } },
-        { title: "룬 폭발", text: "마나 폭발 피해 +22, 범위 +20", apply: () => { player.spellDamage += 22; player.spellRadius += 20; } },
-        { title: "전투 장갑", text: "받는 피해 감소 +12%, 최대 마나 +15", apply: () => { player.armor += .12; player.maxMana += 15; player.mana = player.maxMana; } },
+        { title: "전투 장갑", text: "받는 피해 감소 +12%, 최대 마나 +15", apply: () => { player.armor += .12; player.maxMana += 15; player.mana = player.maxMana; } }
+      ];
+
+      const weaponChangeUpgrades = [
         { title: "무기 변경: 샷건", text: "근거리 산탄. 느리지만 여러 발을 퍼뜨립니다.", apply: () => setWeapon("shotgun") },
         { title: "무기 변경: 머신건", text: "빠른 연사와 큰 탄창. 흔들림과 탄퍼짐이 큽니다.", apply: () => setWeapon("machinegun") },
         { title: "무기 변경: 라이플", text: "느린 연사, 높은 단발 피해, 낮은 탄퍼짐.", apply: () => setWeapon("rifle") }
       ];
 
-      function setWeapon(type) {
+      const secondaryChangeUpgrades = [
+        { title: "우클릭 변경: 수류탄", text: "지점에 폭발을 던져 넓은 범위의 좀비를 타격합니다.", apply: () => setSecondarySkill("grenade") },
+        { title: "우클릭 변경: 대쉬", text: "바라보는 방향으로 빠르게 돌진하고 가까운 적을 밀쳐냅니다.", apply: () => setSecondarySkill("dash") }
+      ];
+
+      function getWeaponUpgrade() {
+        const weapon = weapons[player.weapon] || weapons.pistol;
+        return {
+          title: `${weapon.name} 강화`,
+          text: "현재 무기의 피해, 탄창, 조작성을 강화합니다.",
+          apply: () => {
+            player.weaponLevel++;
+            player.damageBonus += player.weapon === "shotgun" ? 5 : player.weapon === "machinegun" ? 4 : 8;
+            player.damage += player.weapon === "shotgun" ? 5 : player.weapon === "machinegun" ? 4 : 8;
+            player.maxAmmo += player.weapon === "machinegun" ? 6 : 2;
+            player.ammo = player.maxAmmo;
+            player.fireRate = Math.max(60, Math.round(player.fireRate * .9));
+            player.reloadMs = Math.max(360, Math.round(player.reloadMs * .92));
+          }
+        };
+      }
+
+      function getSecondaryUpgrade() {
+        const skill = secondarySkills[player.secondarySkill] || secondarySkills.blast;
+        return {
+          title: `${skill.name} 강화`,
+          text: "현재 우클릭 스킬의 피해, 범위, 재사용성을 강화합니다.",
+          apply: () => {
+            player.secondaryLevel++;
+            player.spellDamage += 18;
+            player.spellRadius += 16;
+            player.spellCost = Math.max(10, player.spellCost - 2);
+          }
+        };
+      }
+
+      function buildUpgradeChoices() {
+        const pool = [...generalUpgrades, getSecondaryUpgrade()];
+        if (player.weaponChanged) pool.push(getWeaponUpgrade());
+        else pool.push(...weaponChangeUpgrades);
+        for (const up of secondaryChangeUpgrades) {
+          if (!player.secondaryChanged || !up.title.includes((secondarySkills[player.secondarySkill] || secondarySkills.blast).name)) pool.push(up);
+        }
+        return pool.sort(() => Math.random() - .5).slice(0, 3);
+      }
+
+      function setWeapon(type, markChanged = true) {
         const weapon = weapons[type] || weapons.pistol;
         player.weapon = type;
+        if (markChanged && type !== "pistol") player.weaponChanged = true;
         player.damage = weapon.damage + player.damageBonus;
         player.fireRate = weapon.fireRate;
         player.maxAmmo = weapon.ammo;
@@ -720,6 +792,12 @@
         player.reloadMs = weapon.reloadMs;
         player.reloading = false;
         ui.weaponText.textContent = weapon.name;
+      }
+
+      function setSecondarySkill(type, markChanged = true) {
+        player.secondarySkill = type;
+        if (markChanged && type !== "blast") player.secondaryChanged = true;
+        ui.skillText.textContent = (secondarySkills[type] || secondarySkills.blast).name;
       }
 
       function resize() {
@@ -909,8 +987,21 @@
       }
 
       function castSpell() {
-        if (!running || pausedForLevel || gameOver || player.mana < player.spellCost) return;
+        if (player.secondarySkill === "grenade") {
+          castGrenade();
+          return;
+        }
+        if (player.secondarySkill === "dash") {
+          castDash();
+          return;
+        }
+        castBlast();
+      }
+
+      function castBlast() {
+        if (!running || pausedForLevel || gameOver || player.secondaryCooldown > 0 || player.mana < player.spellCost) return;
         player.mana -= player.spellCost;
+        player.secondaryCooldown = Math.max(.35, .9 - player.secondaryLevel * .08);
         shake = Math.max(shake, 9);
         beep(180, .08, "sawtooth", .075);
         beep(92, .18, "triangle", .06);
@@ -939,6 +1030,82 @@
           if (d <= player.spellRadius && lineClear(hitX, hitY, enemy.x, enemy.y)) {
             enemy.stun = .35;
             hurtEnemy(enemy, Math.round(player.spellDamage * (1 - d / (player.spellRadius * 1.4))), false);
+          }
+        }
+      }
+
+      function castGrenade() {
+        const cost = Math.max(12, player.spellCost + 4 - player.secondaryLevel * 2);
+        if (!running || pausedForLevel || gameOver || player.secondaryCooldown > 0 || player.mana < cost) return;
+        player.mana -= cost;
+        player.secondaryCooldown = Math.max(.85, 1.7 - player.secondaryLevel * .12);
+        shake = Math.max(shake, 8);
+        beep(210, .08, "triangle", .06);
+        const distance = 155 + player.secondaryLevel * 12;
+        const hitX = player.x + Math.cos(player.angle) * distance;
+        const hitY = player.y + Math.sin(player.angle) * distance;
+        const radius = player.spellRadius + 42 + player.secondaryLevel * 10;
+        spellEffects.push({
+          x: hitX,
+          y: hitY,
+          life: .7,
+          maxLife: .7,
+          radius,
+          angle: player.angle
+        });
+        for (let i = 0; i < 46; i++) {
+          particles.push({
+            x: hitX,
+            y: hitY,
+            vx: (Math.random() - .5) * 330,
+            vy: (Math.random() - .5) * 330,
+            life: .5,
+            color: Math.random() > .45 ? "#ffd37a" : "#ef5b5b"
+          });
+        }
+        for (const enemy of [...enemies]) {
+          const d = Math.hypot(enemy.x - hitX, enemy.y - hitY);
+          if (d <= radius && lineClear(hitX, hitY, enemy.x, enemy.y)) {
+            enemy.stun = .42;
+            hurtEnemy(enemy, Math.round((player.spellDamage + 28) * (1 - d / (radius * 1.35))), false);
+          }
+        }
+      }
+
+      function castDash() {
+        const cost = Math.max(8, Math.floor(player.spellCost * .55) - player.secondaryLevel);
+        if (!running || pausedForLevel || gameOver || player.secondaryCooldown > 0 || player.mana < cost) return;
+        player.mana -= cost;
+        player.secondaryCooldown = Math.max(.55, 1.15 - player.secondaryLevel * .1);
+        shake = Math.max(shake, 7);
+        beep(360, .05, "sawtooth", .05);
+        const distance = 118 + player.secondaryLevel * 18;
+        const steps = 9;
+        for (let i = 0; i < steps; i++) {
+          const nx = player.x + Math.cos(player.angle) * (distance / steps);
+          const ny = player.y + Math.sin(player.angle) * (distance / steps);
+          if (canOccupy(nx, ny, 15)) {
+            player.x = nx;
+            player.y = ny;
+          } else {
+            break;
+          }
+        }
+        for (let i = 0; i < 22; i++) {
+          particles.push({
+            x: player.x - Math.cos(player.angle) * 18,
+            y: player.y - Math.sin(player.angle) * 18,
+            vx: -Math.cos(player.angle) * 150 + (Math.random() - .5) * 120,
+            vy: -Math.sin(player.angle) * 150 + (Math.random() - .5) * 120,
+            life: .28,
+            color: "#7acbff"
+          });
+        }
+        for (const enemy of [...enemies]) {
+          const d = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+          if (d < 68 + player.secondaryLevel * 8) {
+            enemy.stun = .35;
+            hurtEnemy(enemy, 22 + player.secondaryLevel * 8, false);
           }
         }
       }
@@ -977,7 +1144,7 @@
         player.mana = player.maxMana;
         pausedForLevel = true;
         document.exitPointerLock?.();
-        const shuffled = [...upgrades].sort(() => Math.random() - .5).slice(0, 3);
+        const shuffled = buildUpgradeChoices();
         ui.choices.innerHTML = "";
         for (const up of shuffled) {
           const btn = document.createElement("button");
@@ -1028,22 +1195,30 @@
       function endGame() {
         gameOver = true;
         running = false;
+        paused = false;
         document.exitPointerLock?.();
         ui.startOverlay.hidden = false;
         ui.startOverlay.querySelector("h1").textContent = "전투 종료";
         ui.startOverlay.querySelector("p").textContent = `레벨 ${player.level}, 웨이브 ${player.wave}, 처치 ${player.kills}. 다시 도전하려면 시작하세요.`;
         ui.startButton.textContent = "다시 시작";
+        ui.startButton.hidden = false;
+        ui.continueButton.hidden = true;
+        ui.mainMenuButton.hidden = true;
+        ui.menuRecommendButton.hidden = false;
       }
 
       function resetGame() {
         Object.assign(player, {
           x: tile * 2.5, y: tile * 1.5, angle: .36, health: 100, maxHealth: 100,
           mana: 60, maxMana: 60, xp: 0, xpNeed: 75, level: 1, wave: 1,
-          kills: 0, speed: 125, sprint: 1.32, weapon: "pistol", damageBonus: 0, damage: 28, fireRate: 185,
+          kills: 0, speed: 125, sprint: 1.32, weapon: "pistol", weaponChanged: false,
+          damageBonus: 0, weaponLevel: 0, secondarySkill: "blast", secondaryChanged: false,
+          secondaryLevel: 0, secondaryCooldown: 0, damage: 28, fireRate: 185,
           lastShot: 0, ammo: 12, maxAmmo: 12, reloadMs: 860, reloading: false,
           crit: .08, armor: 0, regen: 4, spellCost: 22, spellDamage: 58, spellRadius: 105
         });
-        setWeapon("pistol");
+        setWeapon("pistol", false);
+        setSecondarySkill("blast", false);
         enemies.length = 0;
         bullets.length = 0;
         spellEffects.length = 0;
@@ -1054,6 +1229,47 @@
         pausedForLevel = false;
         ui.levelOverlay.hidden = true;
         spawnWave();
+      }
+
+      function showStartMenu() {
+        paused = false;
+        running = false;
+        gameOver = false;
+        document.exitPointerLock?.();
+        ui.startOverlay.hidden = false;
+        ui.startOverlay.querySelector("h1").textContent = "던전 브레이커";
+        ui.startOverlay.querySelector("p").textContent = "어둠의 성채를 1인칭으로 돌파하는 RPG 슈팅게임입니다. 적을 처치해 경험치를 얻고, 레벨업마다 전투 스타일을 강화하세요.";
+        ui.startButton.textContent = "게임 시작";
+        ui.startButton.hidden = false;
+        ui.continueButton.hidden = true;
+        ui.mainMenuButton.hidden = true;
+        ui.menuRecommendButton.hidden = false;
+      }
+
+      function pauseGame() {
+        if (!running || pausedForLevel || gameOver) return;
+        paused = true;
+        running = false;
+        mouse.down = false;
+        mouse.dragging = false;
+        document.exitPointerLock?.();
+        ui.startOverlay.hidden = false;
+        ui.startOverlay.querySelector("h1").textContent = "일시 정지";
+        ui.startOverlay.querySelector("p").textContent = "전투를 이어가거나 시작 메뉴로 돌아갈 수 있습니다.";
+        ui.startButton.hidden = true;
+        ui.continueButton.hidden = false;
+        ui.mainMenuButton.hidden = false;
+        ui.menuRecommendButton.hidden = false;
+      }
+
+      function resumeGame() {
+        if (!paused || gameOver) return;
+        paused = false;
+        running = true;
+        last = performance.now();
+        ui.startOverlay.hidden = true;
+        canvas.focus();
+        canvas.requestPointerLock?.();
       }
 
       function showMessage(title, text) {
@@ -1089,6 +1305,7 @@
         movePlayer(vx, vy, dt);
 
         if (mouse.down) shoot();
+        player.secondaryCooldown = Math.max(0, player.secondaryCooldown - dt);
         player.mana = Math.min(player.maxMana, player.mana + player.regen * dt);
         messageTimer -= dt;
         if (messageTimer <= 0) ui.message.classList.remove("show");
@@ -1548,6 +1765,7 @@
         ui.waveText.textContent = player.wave;
         ui.killsText.textContent = player.kills;
         ui.weaponText.textContent = (weapons[player.weapon] || weapons.pistol).name;
+        ui.skillText.textContent = (secondarySkills[player.secondarySkill] || secondarySkills.blast).name;
       }
 
       function loop(now) {
@@ -1562,6 +1780,8 @@
       function start() {
         resetGame();
         running = true;
+        paused = false;
+        gameOver = false;
         ui.startOverlay.hidden = true;
         canvas.focus();
         canvas.requestPointerLock?.();
@@ -1574,12 +1794,9 @@
         }
         keys.add(e.code);
         if (e.code === "KeyR") reload();
-        if (e.code === "Escape" && running && !gameOver) {
-          ui.startOverlay.hidden = false;
-          running = false;
-          document.exitPointerLock?.();
-          ui.startOverlay.querySelector("h1").textContent = "일시 정지";
-          ui.startOverlay.querySelector("p").textContent = "게임 시작을 누르면 현재 전투가 새로 시작됩니다.";
+        if (e.code === "Escape") {
+          if (running && !gameOver) pauseGame();
+          else if (paused) resumeGame();
         }
       });
       window.addEventListener("keyup", e => keys.delete(e.code));
@@ -1611,6 +1828,8 @@
       });
       window.addEventListener("contextmenu", e => e.preventDefault());
       ui.startButton.addEventListener("click", start);
+      ui.continueButton.addEventListener("click", resumeGame);
+      ui.mainMenuButton.addEventListener("click", showStartMenu);
       ui.muteButton.addEventListener("click", () => {
         audio.enabled = !audio.enabled;
         ui.muteButton.textContent = audio.enabled ? "소리 끄기" : "소리 켜기";
