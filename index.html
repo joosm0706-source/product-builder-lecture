@@ -646,6 +646,15 @@
       const pickups = [];
       const damageNumbers = [];
 
+      const mouseSensitivity = .0012;
+      const dragSensitivity = .002;
+      const weapons = {
+        pistol: { name: "룬 피스톨", damage: 28, fireRate: 185, ammo: 12, reloadMs: 860, pellets: 1, spread: .025, shake: 5, pitch: 520 },
+        shotgun: { name: "성채 샷건", damage: 14, fireRate: 620, ammo: 5, reloadMs: 1080, pellets: 7, spread: .17, shake: 11, pitch: 260 },
+        machinegun: { name: "룬 머신건", damage: 17, fireRate: 82, ammo: 32, reloadMs: 1320, pellets: 1, spread: .055, shake: 4, pitch: 610 },
+        rifle: { name: "성기사 라이플", damage: 54, fireRate: 360, ammo: 7, reloadMs: 1180, pellets: 1, spread: .008, shake: 7, pitch: 430 }
+      };
+
       const player = {
         x: tile * 2.5,
         y: tile * 1.5,
@@ -659,8 +668,10 @@
         level: 1,
         wave: 1,
         kills: 0,
-        speed: 185,
-        sprint: 1.55,
+        speed: 125,
+        sprint: 1.32,
+        weapon: "pistol",
+        damageBonus: 0,
         damage: 28,
         fireRate: 185,
         lastShot: 0,
@@ -688,13 +699,28 @@
       let wallDists = [];
 
       const upgrades = [
-        { title: "치명 강화", text: "공격력 +9, 치명타 확률 +5%", apply: () => { player.damage += 9; player.crit += .05; } },
+        { title: "치명 강화", text: "공격력 +9, 치명타 확률 +5%", apply: () => { player.damageBonus += 9; player.damage += 9; player.crit += .05; } },
         { title: "혈기 각성", text: "최대 체력 +25, 즉시 회복 +25", apply: () => { player.maxHealth += 25; player.health = Math.min(player.maxHealth, player.health + 25); } },
         { title: "비전 탄창", text: "탄창 +4, 재장전 속도 증가", apply: () => { player.maxAmmo += 4; player.ammo = player.maxAmmo; player.reloadMs = Math.max(420, player.reloadMs - 95); } },
-        { title: "민첩한 발걸음", text: "이동 속도 +13%, 마나 재생 +2", apply: () => { player.speed *= 1.13; player.regen += 2; } },
+        { title: "민첩한 발걸음", text: "이동 속도 +8%, 마나 재생 +2", apply: () => { player.speed *= 1.08; player.regen += 2; } },
         { title: "룬 폭발", text: "마나 폭발 피해 +22, 범위 +20", apply: () => { player.spellDamage += 22; player.spellRadius += 20; } },
-        { title: "전투 장갑", text: "받는 피해 감소 +12%, 최대 마나 +15", apply: () => { player.armor += .12; player.maxMana += 15; player.mana = player.maxMana; } }
+        { title: "전투 장갑", text: "받는 피해 감소 +12%, 최대 마나 +15", apply: () => { player.armor += .12; player.maxMana += 15; player.mana = player.maxMana; } },
+        { title: "무기 변경: 샷건", text: "근거리 산탄. 느리지만 여러 발을 퍼뜨립니다.", apply: () => setWeapon("shotgun") },
+        { title: "무기 변경: 머신건", text: "빠른 연사와 큰 탄창. 흔들림과 탄퍼짐이 큽니다.", apply: () => setWeapon("machinegun") },
+        { title: "무기 변경: 라이플", text: "느린 연사, 높은 단발 피해, 낮은 탄퍼짐.", apply: () => setWeapon("rifle") }
       ];
+
+      function setWeapon(type) {
+        const weapon = weapons[type] || weapons.pistol;
+        player.weapon = type;
+        player.damage = weapon.damage + player.damageBonus;
+        player.fireRate = weapon.fireRate;
+        player.maxAmmo = weapon.ammo;
+        player.ammo = weapon.ammo;
+        player.reloadMs = weapon.reloadMs;
+        player.reloading = false;
+        ui.weaponText.textContent = weapon.name;
+      }
 
       function resize() {
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -806,14 +832,14 @@
             radius,
             health: elite ? 120 + player.wave * 18 : 58 + player.wave * 12,
             maxHealth: elite ? 120 + player.wave * 18 : 58 + player.wave * 12,
-            speed: elite ? 70 + player.wave * 2 : 88 + player.wave * 3,
+            speed: elite ? 54 + player.wave * 2 : 62 + player.wave * 2.4,
             damage: elite ? 22 + player.wave * 3 : 12 + player.wave * 2,
             attackCd: 0,
             elite,
             stun: 0
           });
         }
-        showMessage(`웨이브 ${player.wave}`, `${count}명의 적이 성채에 나타났습니다.`);
+        showMessage(`웨이브 ${player.wave}`, `${count}명의 좀비가 성채 내부로 몰려옵니다.`);
       }
 
       function moveEntity(entity, vx, vy, dt) {
@@ -843,38 +869,42 @@
         }
         player.lastShot = now;
         player.ammo--;
-        shake = Math.max(shake, 5);
-        beep(520 + Math.random() * 80, .055, "square", .045);
+        const weapon = weapons[player.weapon] || weapons.pistol;
+        shake = Math.max(shake, weapon.shake);
+        beep(weapon.pitch + Math.random() * 70, .055, "square", .045);
 
-        const spread = (Math.random() - .5) * .025;
-        const angle = player.angle + spread;
-        bullets.push({
-          x: player.x + Math.cos(player.angle) * 22,
-          y: player.y + Math.sin(player.angle) * 22,
-          angle,
-          life: .18,
-          maxLife: .18,
-          length: 390
-        });
+        for (let shot = 0; shot < weapon.pellets; shot++) {
+          const spread = (Math.random() - .5) * weapon.spread;
+          const angle = player.angle + spread;
+          bullets.push({
+            x: player.x + Math.cos(player.angle) * 22,
+            y: player.y + Math.sin(player.angle) * 22,
+            angle,
+            life: .18,
+            maxLife: .18,
+            length: player.weapon === "shotgun" ? 230 : 430
+          });
 
-        let best = null;
-        let bestScore = Infinity;
-        for (const enemy of enemies) {
-          const dx = enemy.x - player.x;
-          const dy = enemy.y - player.y;
-          const dist = Math.hypot(dx, dy);
-          const diff = Math.abs(normalizeAngle(Math.atan2(dy, dx) - angle));
-          const threshold = Math.atan2(enemy.radius + 10, dist);
-          if (diff < threshold && dist < bestScore && lineClear(player.x, player.y, enemy.x, enemy.y)) {
-            best = enemy;
-            bestScore = dist;
+          let best = null;
+          let bestScore = Infinity;
+          for (const enemy of enemies) {
+            const dx = enemy.x - player.x;
+            const dy = enemy.y - player.y;
+            const dist = Math.hypot(dx, dy);
+            const diff = Math.abs(normalizeAngle(Math.atan2(dy, dx) - angle));
+            const threshold = Math.atan2(enemy.radius + 10, dist);
+            if (diff < threshold && dist < bestScore && lineClear(player.x, player.y, enemy.x, enemy.y)) {
+              best = enemy;
+              bestScore = dist;
+            }
           }
-        }
 
-        if (best) {
-          const crit = Math.random() < player.crit;
-          const dmg = Math.round(player.damage * (crit ? 1.9 : 1) * (1 + player.level * .025));
-          hurtEnemy(best, dmg, crit);
+          if (best) {
+            const crit = Math.random() < player.crit;
+            const rangeFalloff = player.weapon === "shotgun" ? Math.max(.45, 1 - bestScore / 520) : 1;
+            const dmg = Math.round(player.damage * rangeFalloff * (crit ? 1.9 : 1) * (1 + player.level * .025));
+            hurtEnemy(best, dmg, crit);
+          }
         }
       }
 
@@ -1009,10 +1039,11 @@
         Object.assign(player, {
           x: tile * 2.5, y: tile * 1.5, angle: .36, health: 100, maxHealth: 100,
           mana: 60, maxMana: 60, xp: 0, xpNeed: 75, level: 1, wave: 1,
-          kills: 0, speed: 185, sprint: 1.55, damage: 28, fireRate: 185,
+          kills: 0, speed: 125, sprint: 1.32, weapon: "pistol", damageBonus: 0, damage: 28, fireRate: 185,
           lastShot: 0, ammo: 12, maxAmmo: 12, reloadMs: 860, reloading: false,
           crit: .08, armor: 0, regen: 4, spellCost: 22, spellDamage: 58, spellRadius: 105
         });
+        setWeapon("pistol");
         enemies.length = 0;
         bullets.length = 0;
         spellEffects.length = 0;
@@ -1145,13 +1176,13 @@
             const seamY = Math.abs((wy % tile) - tile / 2) > tile * .43;
 
             if (cell === "1") {
-              ctx.fillStyle = `rgba(87, 58, 37, ${.45 * fade})`;
+              ctx.fillStyle = `rgba(56, 58, 61, ${.52 * fade})`;
             } else if (seamX || seamY) {
-              ctx.fillStyle = `rgba(232, 178, 98, ${.34 * fade})`;
+              ctx.fillStyle = `rgba(142, 130, 112, ${.32 * fade})`;
             } else {
               ctx.fillStyle = checker
-                ? `rgba(61, 48, 37, ${.9 * fade})`
-                : `rgba(78, 59, 42, ${.9 * fade})`;
+                ? `rgba(52, 50, 47, ${.92 * fade})`
+                : `rgba(66, 62, 56, ${.92 * fade})`;
             }
             ctx.fillRect(x, y, step + 1, step + 1);
           }
@@ -1161,36 +1192,52 @@
       function drawWorld() {
         const horizon = height * .5;
         const sky = ctx.createLinearGradient(0, 0, 0, height * .5);
-        sky.addColorStop(0, "#07111f");
-        sky.addColorStop(.42, "#17243a");
-        sky.addColorStop(1, "#55392d");
+        sky.addColorStop(0, "#121416");
+        sky.addColorStop(.55, "#24272a");
+        sky.addColorStop(1, "#3a332b");
         ctx.fillStyle = sky;
         ctx.fillRect(0, 0, width, height * .5);
 
         ctx.save();
-        ctx.globalAlpha = .75;
-        ctx.fillStyle = "#f3df9b";
-        ctx.beginPath();
-        ctx.arc(width * .78, height * .14, Math.max(22, width * .018), 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "rgba(255, 255, 255, .8)";
-        for (let i = 0; i < 44; i++) {
-          const x = (i * 97 + 31) % width;
-          const y = (i * 53 + 19) % Math.max(1, height * .42);
-          ctx.fillRect(x, y, i % 3 === 0 ? 2 : 1, i % 3 === 0 ? 2 : 1);
+        ctx.globalAlpha = .92;
+        ctx.strokeStyle = "rgba(120, 116, 108, .32)";
+        ctx.lineWidth = 2;
+        for (let i = -2; i <= 8; i++) {
+          const archX = i * width / 6 - (player.angle % .8) * width / 5;
+          ctx.beginPath();
+          ctx.ellipse(archX, height * .5, width * .18, height * .48, 0, Math.PI, Math.PI * 2);
+          ctx.stroke();
+        }
+        for (let i = 0; i < 5; i++) {
+          const x = (i + .5) * width / 5 + Math.sin(player.angle + i) * 18;
+          const y = height * (.18 + (i % 2) * .08);
+          const glow = ctx.createRadialGradient(x, y, 0, x, y, 96);
+          glow.addColorStop(0, "rgba(255, 174, 76, .55)");
+          glow.addColorStop(.35, "rgba(196, 75, 38, .22)");
+          glow.addColorStop(1, "rgba(196, 75, 38, 0)");
+          ctx.fillStyle = glow;
+          ctx.fillRect(x - 100, y - 100, 200, 200);
+          ctx.fillStyle = "#ffb24f";
+          ctx.beginPath();
+          ctx.moveTo(x, y - 13);
+          ctx.quadraticCurveTo(x + 10, y, x, y + 15);
+          ctx.quadraticCurveTo(x - 11, y, x, y - 13);
+          ctx.fill();
+          ctx.fillStyle = "#30251c";
+          ctx.fillRect(x - 12, y + 15, 24, 8);
         }
         ctx.restore();
 
         const floor = ctx.createLinearGradient(0, horizon, 0, height);
-        floor.addColorStop(0, "#4a3827");
-        floor.addColorStop(.5, "#2b241c");
-        floor.addColorStop(1, "#15120f");
+        floor.addColorStop(0, "#4a4540");
+        floor.addColorStop(.52, "#2d2b28");
+        floor.addColorStop(1, "#141312");
         ctx.fillStyle = floor;
         ctx.fillRect(0, horizon, width, height - horizon);
         drawFloorTiles(horizon);
 
         ctx.save();
-        ctx.strokeStyle = "rgba(255, 210, 140, .12)";
+        ctx.strokeStyle = "rgba(192, 178, 150, .16)";
         ctx.lineWidth = 1;
         for (let i = 0; i < 18; i++) {
           const t = i / 18;
@@ -1220,21 +1267,25 @@
           const wallH = Math.min(height * 1.6, (tile * height) / Math.max(1, corrected));
           const y = horizon - wallH / 2;
           const fog = Math.max(.18, 1 - corrected / maxDepth);
-          const shade = Math.round(150 * fog * ray.shade + 42);
-          const brick = Math.floor(ray.y / 24) % 2 === 0 ? 10 : -6;
-          ctx.fillStyle = `rgb(${shade + 48 + brick}, ${shade + 35 + brick}, ${shade + 18 + brick})`;
+          const shade = Math.round(118 * fog * ray.shade + 42);
+          const brick = Math.floor(ray.y / 24) % 2 === 0 ? 10 : -8;
+          ctx.fillStyle = `rgb(${shade + 24 + brick}, ${shade + 22 + brick}, ${shade + 20 + brick})`;
           ctx.fillRect(i * stripW, y, stripW, wallH);
-          ctx.fillStyle = `rgba(255, 226, 150, ${.24 * fog})`;
+          ctx.fillStyle = `rgba(220, 205, 174, ${.2 * fog})`;
           ctx.fillRect(i * stripW, y, 1, wallH);
           if (i % 8 === 0) {
             ctx.fillStyle = `rgba(0, 0, 0, ${.14 * fog})`;
             ctx.fillRect(i * stripW, y, 1.5, wallH);
           }
           if (wallH > 60) {
-            ctx.fillStyle = `rgba(0, 0, 0, ${.18 * fog})`;
+            ctx.fillStyle = `rgba(0, 0, 0, ${.24 * fog})`;
             const brickY = y + (Math.floor(ray.x + ray.y) % 32);
             for (let by = brickY; by < y + wallH; by += 32) {
               ctx.fillRect(i * stripW, by, stripW, 1);
+            }
+            if (i % 18 === 0) {
+              ctx.fillStyle = `rgba(255, 152, 61, ${.08 * fog})`;
+              ctx.fillRect(i * stripW, y, stripW * 5, wallH);
             }
           }
         }
@@ -1274,23 +1325,44 @@
       }
 
       function drawEnemy(enemy, pr) {
-        const w = pr.size * .48;
-        const h = pr.size * .86;
+        const w = pr.size * .5;
+        const h = pr.size * .88;
         const x = pr.x - w / 2;
         const y = pr.y - h / 2 + pr.size * .12;
         const grd = ctx.createLinearGradient(x, y, x, y + h);
-        grd.addColorStop(0, enemy.elite ? "#8d4cff" : "#d14b4b");
-        grd.addColorStop(1, enemy.elite ? "#2b173f" : "#351516");
+        grd.addColorStop(0, enemy.elite ? "#7f9870" : "#6f8a61");
+        grd.addColorStop(.55, enemy.elite ? "#38442f" : "#2f3d2a");
+        grd.addColorStop(1, "#171c16");
         ctx.fillStyle = grd;
         ctx.beginPath();
-        ctx.roundRect(x, y, w, h, Math.max(4, w * .18));
+        ctx.roundRect(x + w * .16, y + h * .18, w * .68, h * .68, Math.max(4, w * .16));
         ctx.fill();
-        ctx.fillStyle = "#ffe3a0";
-        ctx.fillRect(x + w * .22, y + h * .22, w * .16, Math.max(2, h * .035));
-        ctx.fillRect(x + w * .62, y + h * .22, w * .16, Math.max(2, h * .035));
+        ctx.fillStyle = enemy.elite ? "#9cad86" : "#829a72";
+        ctx.beginPath();
+        ctx.arc(x + w * .5, y + h * .16, w * .2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#2a3327";
+        ctx.lineWidth = Math.max(2, w * .045);
+        ctx.beginPath();
+        ctx.moveTo(x + w * .24, y + h * .3);
+        ctx.lineTo(x - w * .04, y + h * .5);
+        ctx.moveTo(x + w * .76, y + h * .3);
+        ctx.lineTo(x + w * 1.04, y + h * .5);
+        ctx.moveTo(x + w * .4, y + h * .82);
+        ctx.lineTo(x + w * .28, y + h);
+        ctx.moveTo(x + w * .6, y + h * .82);
+        ctx.lineTo(x + w * .74, y + h);
+        ctx.stroke();
+        ctx.fillStyle = "#f2e9b8";
+        ctx.fillRect(x + w * .39, y + h * .13, w * .09, Math.max(2, h * .028));
+        ctx.fillRect(x + w * .55, y + h * .13, w * .09, Math.max(2, h * .028));
+        ctx.fillStyle = "#401d1d";
+        ctx.fillRect(x + w * .42, y + h * .25, w * .2, Math.max(2, h * .025));
+        ctx.fillStyle = "rgba(120, 0, 0, .48)";
+        ctx.fillRect(x + w * .22, y + h * .5, w * .16, h * .06);
         ctx.fillStyle = "rgba(0, 0, 0, .55)";
         ctx.fillRect(x, y - 10, w, 5);
-        ctx.fillStyle = enemy.elite ? "#c99bff" : "#ff6d63";
+        ctx.fillStyle = enemy.elite ? "#b8d68f" : "#9fce75";
         ctx.fillRect(x, y - 10, w * Math.max(0, enemy.health / enemy.maxHealth), 5);
       }
 
@@ -1351,17 +1423,35 @@
         const bob = Math.sin(performance.now() / 110) * (keys.size ? 4 : 1);
         const x = width * .62;
         const y = height - 112 + bob;
+        const type = player.weapon;
+        const barrel = type === "shotgun" ? 138 : type === "machinegun" ? 176 : type === "rifle" ? 188 : 118;
+        const body = type === "shotgun" ? "#4a2d20" : type === "machinegun" ? "#25282a" : type === "rifle" ? "#5a3d27" : "#553b27";
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(-.08);
-        ctx.fillStyle = "#201914";
-        ctx.fillRect(20, 34, 154, 40);
-        ctx.fillStyle = "#553b27";
-        ctx.fillRect(86, 65, 42, 74);
+        ctx.fillStyle = "#17191a";
+        ctx.fillRect(20, 34, barrel, 40);
+        ctx.fillStyle = body;
+        ctx.fillRect(type === "machinegun" ? 102 : 86, 65, type === "rifle" ? 34 : 42, 74);
         ctx.fillStyle = "#cf9a45";
-        ctx.fillRect(2, 24, 92, 24);
-        ctx.fillStyle = "#755237";
-        ctx.fillRect(66, 18, 118, 18);
+        ctx.fillRect(2, 24, type === "shotgun" ? 112 : 92, 24);
+        ctx.fillStyle = type === "machinegun" ? "#555b5e" : "#755237";
+        ctx.fillRect(66, 18, barrel * .78, 18);
+        if (type === "shotgun") {
+          ctx.fillStyle = "#272b2d";
+          ctx.fillRect(66, 8, 122, 8);
+        }
+        if (type === "machinegun") {
+          ctx.fillStyle = "#111";
+          ctx.fillRect(98, 72, 74, 34);
+          ctx.fillStyle = "#34393c";
+          for (let i = 0; i < 5; i++) ctx.fillRect(34 + i * 28, 13, 12, 28);
+        }
+        if (type === "rifle") {
+          ctx.fillStyle = "#111";
+          ctx.fillRect(96, 2, 54, 10);
+          ctx.fillRect(115, -12, 16, 16);
+        }
         ctx.fillStyle = "rgba(255, 226, 145, .95)";
         ctx.fillRect(0, 29, 20, 7);
         ctx.restore();
@@ -1457,6 +1547,7 @@
         ui.levelText.textContent = player.level;
         ui.waveText.textContent = player.wave;
         ui.killsText.textContent = player.kills;
+        ui.weaponText.textContent = (weapons[player.weapon] || weapons.pistol).name;
       }
 
       function loop(now) {
@@ -1494,10 +1585,10 @@
       window.addEventListener("keyup", e => keys.delete(e.code));
       window.addEventListener("mousemove", e => {
         if (document.pointerLockElement === canvas && running && !pausedForLevel) {
-          player.angle = normalizeAngle(player.angle + e.movementX * .0025);
+          player.angle = normalizeAngle(player.angle + e.movementX * mouseSensitivity);
         } else if (mouse.dragging && running && !pausedForLevel) {
           const dx = e.clientX - mouse.lastX;
-          player.angle = normalizeAngle(player.angle + dx * .004);
+          player.angle = normalizeAngle(player.angle + dx * dragSensitivity);
           mouse.lastX = e.clientX;
         }
       });
