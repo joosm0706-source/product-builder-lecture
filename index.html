@@ -299,6 +299,119 @@
 
     .damage-flash.show { opacity: 1; }
 
+    .contact-launcher {
+      position: fixed;
+      right: 18px;
+      top: 82px;
+      z-index: 5;
+      pointer-events: auto;
+    }
+
+    .contact-panel {
+      position: fixed;
+      right: 18px;
+      top: 134px;
+      z-index: 6;
+      width: min(360px, calc(100vw - 28px));
+      padding: 18px;
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .52);
+      backdrop-filter: blur(16px);
+      transform: translateX(calc(100% + 32px));
+      opacity: 0;
+      pointer-events: none;
+      transition: transform .22s ease, opacity .22s ease;
+    }
+
+    .contact-panel.open {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .contact-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .contact-head h2 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    .contact-head p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .icon-button {
+      appearance: none;
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      color: var(--text);
+      background: rgba(255, 255, 255, .06);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .contact-form {
+      display: grid;
+      gap: 10px;
+    }
+
+    .contact-form label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .contact-form input,
+    .contact-form textarea {
+      width: 100%;
+      min-height: 42px;
+      padding: 10px 11px;
+      color: var(--text);
+      background: rgba(0, 0, 0, .28);
+      border: 1px solid rgba(255, 255, 255, .16);
+      border-radius: 8px;
+      outline: none;
+    }
+
+    .contact-form textarea {
+      min-height: 108px;
+      resize: vertical;
+    }
+
+    .contact-form input:focus,
+    .contact-form textarea:focus,
+    .icon-button:hover {
+      border-color: rgba(255, 211, 122, .75);
+    }
+
+    .contact-status {
+      min-height: 20px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .contact-status.success { color: var(--good); }
+    .contact-status.error { color: var(--bad); }
+
     @media (max-width: 720px) {
       .hud { padding: 10px; }
       .topbar, .bottombar { align-items: flex-start; }
@@ -306,6 +419,14 @@
       .pill { font-size: 12px; min-height: 32px; padding: 6px 8px; }
       .controls, .choices { grid-template-columns: 1fr; }
       .choice { min-height: 102px; }
+      .contact-launcher {
+        right: 10px;
+        top: 70px;
+      }
+      .contact-panel {
+        right: 10px;
+        top: 122px;
+      }
     }
   </style>
 </head>
@@ -345,6 +466,35 @@
   </div>
 
   <div class="damage-flash" id="damageFlash"></div>
+
+  <button class="button contact-launcher" id="contactToggle" type="button" aria-controls="contactPanel" aria-expanded="false">문의하기</button>
+
+  <aside class="contact-panel" id="contactPanel" aria-label="광고 및 제휴 문의" aria-hidden="true">
+    <div class="contact-head">
+      <div>
+        <h2>광고 및 제휴 문의</h2>
+        <p>광고 집행, 브랜드 협업, 기타 제휴 제안을 보내주세요.</p>
+      </div>
+      <button class="icon-button" id="contactClose" type="button" aria-label="문의 닫기">X</button>
+    </div>
+    <form class="contact-form" id="contactForm" action="https://formspree.io/f/xnjkpbad" method="POST">
+      <label>
+        이름
+        <input name="name" autocomplete="name" required>
+      </label>
+      <label>
+        이메일
+        <input name="email" type="email" autocomplete="email" required>
+      </label>
+      <label>
+        문의 내용
+        <textarea name="message" required placeholder="광고/제휴 목적, 예산, 일정 등을 적어주세요."></textarea>
+      </label>
+      <input type="hidden" name="_subject" value="던전 브레이커 광고 및 제휴 문의">
+      <button class="button" id="contactSubmit" type="submit">문의 보내기</button>
+      <p class="contact-status" id="contactStatus" role="status" aria-live="polite"></p>
+    </form>
+  </aside>
 
   <section class="overlay" id="startOverlay">
     <div class="menu">
@@ -1335,6 +1485,80 @@
       draw();
       updateUi();
       requestAnimationFrame(loop);
+    })();
+
+    (() => {
+      "use strict";
+
+      const toggle = document.getElementById("contactToggle");
+      const panel = document.getElementById("contactPanel");
+      const close = document.getElementById("contactClose");
+      const form = document.getElementById("contactForm");
+      const submit = document.getElementById("contactSubmit");
+      const status = document.getElementById("contactStatus");
+
+      function setPanel(open) {
+        panel.classList.toggle("open", open);
+        panel.setAttribute("aria-hidden", String(!open));
+        toggle.setAttribute("aria-expanded", String(open));
+        if (open) {
+          document.exitPointerLock?.();
+          form.querySelector("input, textarea")?.focus();
+        } else {
+          toggle.focus();
+        }
+      }
+
+      function setStatus(message, type = "") {
+        status.textContent = message;
+        status.className = `contact-status ${type}`.trim();
+      }
+
+      toggle.addEventListener("click", event => {
+        event.stopPropagation();
+        setPanel(!panel.classList.contains("open"));
+      });
+
+      close.addEventListener("click", event => {
+        event.stopPropagation();
+        setPanel(false);
+      });
+
+      panel.addEventListener("mousedown", event => event.stopPropagation());
+      panel.addEventListener("mouseup", event => event.stopPropagation());
+      panel.addEventListener("click", event => event.stopPropagation());
+      panel.addEventListener("contextmenu", event => event.stopPropagation());
+
+      window.addEventListener("keydown", event => {
+        if (event.code === "Escape" && panel.classList.contains("open")) {
+          event.preventDefault();
+          event.stopPropagation();
+          setPanel(false);
+        }
+      }, true);
+
+      form.addEventListener("submit", async event => {
+        event.preventDefault();
+        submit.disabled = true;
+        setStatus("전송 중입니다.");
+
+        try {
+          const response = await fetch(form.action, {
+            method: "POST",
+            body: new FormData(form),
+            headers: { Accept: "application/json" }
+          });
+
+          if (!response.ok) throw new Error("Formspree request failed");
+
+          form.reset();
+          setStatus("문의가 전송되었습니다.", "success");
+        } catch (error) {
+          setStatus("전송에 실패했습니다. 잠시 후 다시 시도해주세요.", "error");
+        } finally {
+          submit.disabled = false;
+        }
+      });
     })();
   </script>
 </body>
