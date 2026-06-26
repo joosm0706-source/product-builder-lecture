@@ -3,7 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="google-adsense-account" content="ca-pub-2008012279958185">
   <title>던전 브레이커 - 1인칭 RPG 슈팅</title>
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2008012279958185"
+     crossorigin="anonymous"></script>
   <style>
     :root {
       color-scheme: dark;
@@ -576,10 +579,20 @@
       </div>
       <div class="actions">
         <button class="button" id="startButton">게임 시작</button>
-        <button class="button secondary" id="muteButton">소리 켜기</button>
+        <button class="button secondary" id="muteButton">소리 끄기</button>
         <a class="button secondary" id="menuRecommendButton" href="https://www.google.com/search?q=%EB%A9%94%EB%89%B4+%EC%B6%94%EC%B2%9C" target="_blank" rel="noopener">메뉴 추천</a>
-        <button class="button" id="continueButton" type="button" hidden>계속하기</button>
-        <button class="button secondary" id="mainMenuButton" type="button" hidden>시작메뉴로가기</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="overlay" id="pauseOverlay" hidden>
+    <div class="menu">
+      <h1>일시 정지</h1>
+      <p>전투를 이어가거나 시작 메뉴로 돌아갈 수 있습니다.</p>
+      <div class="actions">
+        <button class="button" id="continueButton" type="button">계속하기</button>
+        <button class="button secondary" id="pauseMuteButton" type="button">소리 끄기</button>
+        <button class="button secondary" id="mainMenuButton" type="button">시작메뉴로가기</button>
       </div>
     </div>
   </section>
@@ -611,10 +624,12 @@
         weaponText: document.getElementById("weaponText"),
         skillText: document.getElementById("skillText"),
         startOverlay: document.getElementById("startOverlay"),
+        pauseOverlay: document.getElementById("pauseOverlay"),
         levelOverlay: document.getElementById("levelOverlay"),
         choices: document.getElementById("choices"),
         startButton: document.getElementById("startButton"),
         muteButton: document.getElementById("muteButton"),
+        pauseMuteButton: document.getElementById("pauseMuteButton"),
         continueButton: document.getElementById("continueButton"),
         mainMenuButton: document.getElementById("mainMenuButton"),
         menuRecommendButton: document.getElementById("menuRecommendButton"),
@@ -649,7 +664,7 @@
       const maxDepth = 900;
       const keys = new Set();
       const mouse = { locked: false, down: false, dragging: false, lastX: 0 };
-      const audio = { ctx: null, enabled: false };
+      const audio = { ctx: null, enabled: true };
       const particles = [];
       const bullets = [];
       const spellEffects = [];
@@ -924,16 +939,16 @@
         const nx = entity.x + vx * dt;
         const ny = entity.y + vy * dt;
         const r = entity.radius || 12;
-        if (!isWall(nx + Math.sign(vx) * r, entity.y)) entity.x = nx;
-        if (!isWall(entity.x, ny + Math.sign(vy) * r)) entity.y = ny;
+        if (canOccupy(nx, entity.y, r)) entity.x = nx;
+        if (canOccupy(entity.x, ny, r)) entity.y = ny;
       }
 
       function movePlayer(vx, vy, dt) {
         const radius = 15;
         const nx = player.x + vx * dt;
         const ny = player.y + vy * dt;
-        if (!isWall(nx + Math.sign(vx) * radius, player.y)) player.x = nx;
-        if (!isWall(player.x, ny + Math.sign(vy) * radius)) player.y = ny;
+        if (canOccupy(nx, player.y, radius)) player.x = nx;
+        if (canOccupy(player.x, ny, radius)) player.y = ny;
       }
 
       function shoot() {
@@ -1174,7 +1189,7 @@
         if (player.reloading || player.ammo === player.maxAmmo) return;
         player.reloading = true;
         ui.ammoText.textContent = "재장전";
-        beep(260, .08, "triangle", .035);
+        playReloadSound();
         setTimeout(() => {
           player.ammo = player.maxAmmo;
           player.reloading = false;
@@ -1198,12 +1213,10 @@
         paused = false;
         document.exitPointerLock?.();
         ui.startOverlay.hidden = false;
+        ui.pauseOverlay.hidden = true;
         ui.startOverlay.querySelector("h1").textContent = "전투 종료";
         ui.startOverlay.querySelector("p").textContent = `레벨 ${player.level}, 웨이브 ${player.wave}, 처치 ${player.kills}. 다시 도전하려면 시작하세요.`;
         ui.startButton.textContent = "다시 시작";
-        ui.startButton.hidden = false;
-        ui.continueButton.hidden = true;
-        ui.mainMenuButton.hidden = true;
         ui.menuRecommendButton.hidden = false;
       }
 
@@ -1237,12 +1250,10 @@
         gameOver = false;
         document.exitPointerLock?.();
         ui.startOverlay.hidden = false;
+        ui.pauseOverlay.hidden = true;
         ui.startOverlay.querySelector("h1").textContent = "던전 브레이커";
         ui.startOverlay.querySelector("p").textContent = "어둠의 성채를 1인칭으로 돌파하는 RPG 슈팅게임입니다. 적을 처치해 경험치를 얻고, 레벨업마다 전투 스타일을 강화하세요.";
         ui.startButton.textContent = "게임 시작";
-        ui.startButton.hidden = false;
-        ui.continueButton.hidden = true;
-        ui.mainMenuButton.hidden = true;
         ui.menuRecommendButton.hidden = false;
       }
 
@@ -1253,13 +1264,8 @@
         mouse.down = false;
         mouse.dragging = false;
         document.exitPointerLock?.();
-        ui.startOverlay.hidden = false;
-        ui.startOverlay.querySelector("h1").textContent = "일시 정지";
-        ui.startOverlay.querySelector("p").textContent = "전투를 이어가거나 시작 메뉴로 돌아갈 수 있습니다.";
-        ui.startButton.hidden = true;
-        ui.continueButton.hidden = false;
-        ui.mainMenuButton.hidden = false;
-        ui.menuRecommendButton.hidden = false;
+        ui.startOverlay.hidden = true;
+        ui.pauseOverlay.hidden = false;
       }
 
       function resumeGame() {
@@ -1267,7 +1273,7 @@
         paused = false;
         running = true;
         last = performance.now();
-        ui.startOverlay.hidden = true;
+        ui.pauseOverlay.hidden = true;
         canvas.focus();
         canvas.requestPointerLock?.();
       }
@@ -1291,6 +1297,24 @@
         osc.connect(amp).connect(audio.ctx.destination);
         osc.start();
         osc.stop(audio.ctx.currentTime + duration);
+      }
+
+      function playReloadSound() {
+        beep(230, .07, "triangle", .035);
+        setTimeout(() => beep(180, .06, "sawtooth", .025), Math.max(90, player.reloadMs * .24));
+        setTimeout(() => beep(300, .05, "triangle", .03), Math.max(180, player.reloadMs * .58));
+      }
+
+      function updateSoundButtons() {
+        const label = audio.enabled ? "소리 끄기" : "소리 켜기";
+        ui.muteButton.textContent = label;
+        ui.pauseMuteButton.textContent = label;
+      }
+
+      function toggleSound() {
+        audio.enabled = !audio.enabled;
+        updateSoundButtons();
+        if (audio.enabled) beep(440, .08, "triangle", .04);
       }
 
       function update(dt) {
@@ -1514,10 +1538,11 @@
         const dist = Math.hypot(dx, dy);
         const angle = normalizeAngle(Math.atan2(dy, dx) - player.angle);
         if (Math.abs(angle) > fov * .72 || dist < 5) return null;
+        if ((obj.kind === "enemy" || obj.kind === "pickup") && !lineClear(player.x, player.y, obj.x, obj.y)) return null;
         const screenX = (angle / (fov / 2) * .5 + .5) * width;
         const size = Math.min(height, (tile * height) / dist * (obj.scale || 1));
         const column = Math.floor(screenX / width * wallDists.length);
-        if (wallDists[column] && dist > wallDists[column] + 20) return null;
+        if (wallDists[column] && dist > wallDists[column] - Math.max(4, obj.radius || 10)) return null;
         return { x: screenX, y: height / 2, size, dist };
       }
 
@@ -1783,6 +1808,7 @@
         paused = false;
         gameOver = false;
         ui.startOverlay.hidden = true;
+        ui.pauseOverlay.hidden = true;
         canvas.focus();
         canvas.requestPointerLock?.();
       }
@@ -1830,11 +1856,8 @@
       ui.startButton.addEventListener("click", start);
       ui.continueButton.addEventListener("click", resumeGame);
       ui.mainMenuButton.addEventListener("click", showStartMenu);
-      ui.muteButton.addEventListener("click", () => {
-        audio.enabled = !audio.enabled;
-        ui.muteButton.textContent = audio.enabled ? "소리 끄기" : "소리 켜기";
-        if (audio.enabled) beep(440, .08, "triangle", .04);
-      });
+      ui.muteButton.addEventListener("click", toggleSound);
+      ui.pauseMuteButton.addEventListener("click", toggleSound);
       canvas.addEventListener("click", () => {
         if (running && !pausedForLevel) canvas.requestPointerLock?.();
       });
@@ -1854,6 +1877,7 @@
       }
 
       resize();
+      updateSoundButtons();
       draw();
       updateUi();
       requestAnimationFrame(loop);
