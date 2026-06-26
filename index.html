@@ -478,7 +478,7 @@
 
     .menu-slots {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
       margin-bottom: 12px;
     }
@@ -673,14 +673,13 @@
     <div class="menu-head">
       <div>
         <h2>메뉴 추천</h2>
-        <p>슬롯을 돌려 오늘 먹을 메뉴를 골라보세요.</p>
+      <p>먼저 음식 종류를 뽑고, 이어서 해당 종류의 메뉴를 추천합니다.</p>
       </div>
       <button class="icon-button" id="menuClose" type="button" aria-label="메뉴 추천 닫기">X</button>
     </div>
     <div class="menu-slots">
-      <div class="menu-slot"><div class="menu-slot-value" id="menuSlotA">양식</div></div>
-      <div class="menu-slot"><div class="menu-slot-value" id="menuSlotB">파스타</div></div>
-      <div class="menu-slot"><div class="menu-slot-value" id="menuSlotC">오늘 저녁</div></div>
+      <div class="menu-slot"><div class="menu-slot-value" id="menuCategorySlot">종류 슬롯</div></div>
+      <div class="menu-slot"><div class="menu-slot-value" id="menuDishSlot">메뉴 슬롯</div></div>
     </div>
     <div class="actions">
       <button class="button" id="menuSpinButton" type="button">슬롯 돌리기</button>
@@ -688,16 +687,17 @@
     </div>
     <div class="menu-result" id="menuResult" aria-live="polite">
       <strong>오늘 뭐 먹지?</strong>
-      슬롯을 돌리면 음식 종류와 구체적인 메뉴를 추천합니다.
+      슬롯을 돌리면 음식 종류와 메뉴가 순서대로 결정됩니다.
     </div>
     <div class="menu-chips" aria-label="추천 카테고리">
       <span class="menu-chip">양식</span>
       <span class="menu-chip">중식</span>
+      <span class="menu-chip">한식</span>
       <span class="menu-chip">일식</span>
       <span class="menu-chip">동남아</span>
-      <span class="menu-chip">분식</span>
+      <span class="menu-chip">멕시칸</span>
       <span class="menu-chip">야식</span>
-      <span class="menu-chip">바베큐</span>
+      <span class="menu-chip">고기</span>
     </div>
   </aside>
 
@@ -2135,23 +2135,108 @@
       "use strict";
 
       const categories = [
-        { name: "양식", menus: ["파스타", "스테이크", "리조또", "버거", "피자"], note: "크림/토마토/오일 중 하나만 정하면 실패 확률이 낮습니다." },
-        { name: "중식", menus: ["마라탕", "짜장면", "짬뽕", "탕수육", "양꼬치"], note: "매운맛이 당기면 마라, 든든하게 가려면 면 요리가 좋습니다." },
-        { name: "일식", menus: ["초밥", "라멘", "돈카츠", "규동", "우동"], note: "깔끔한 한 끼가 필요하면 일식이 무난합니다." },
-        { name: "동남아", menus: ["쌀국수", "팟타이", "나시고렝", "반미", "똠얌꿍"], note: "향신료와 새콤한 맛이 괜찮은 날에 잘 맞습니다." },
-        { name: "분식", menus: ["떡볶이", "김밥", "라볶이", "튀김", "순대"], note: "가볍게 먹거나 여러 메뉴를 나눠 먹기 좋습니다." },
-        { name: "야식", menus: ["치킨", "족발", "보쌈", "곱창", "닭발"], note: "늦은 시간에는 나눠 먹기 좋은 메뉴가 만족도가 높습니다." },
-        { name: "바베큐", menus: ["삼겹살", "폭립", "브리스킷", "닭갈비", "그릴 소시지"], note: "불맛과 고기 위주로 확실하게 배부른 선택입니다." }
+        {
+          id: "western",
+          name: "양식",
+          label: "양식 슬롯머신",
+          menus: [
+            { name: "파스타", note: "파스타는 소스만 정하면 취향을 맞추기 쉬운 안정적인 선택입니다." },
+            { name: "스테이크", note: "스테이크는 제대로 든든한 한 끼가 필요할 때 만족도가 높습니다." },
+            { name: "리조또", note: "리조또는 부드럽고 따뜻한 식감이 좋아 천천히 먹기 좋습니다." },
+            { name: "버거", note: "버거는 감자튀김까지 곁들이면 간편하지만 확실하게 배부릅니다." },
+            { name: "피자", note: "피자는 여러 명이 나눠 먹을 때 실패가 적은 메뉴입니다." }
+          ]
+        },
+        {
+          id: "chinese",
+          name: "중식",
+          label: "중식 슬롯머신",
+          menus: [
+            { name: "마라탕", note: "마라탕은 재료를 직접 고를 수 있어 매운맛과 포만감을 동시에 잡습니다." },
+            { name: "짜장면", note: "짜장면은 단짠 소스가 당길 때 가장 빠르게 만족감을 줍니다." },
+            { name: "짬뽕", note: "짬뽕은 얼큰한 국물과 해산물 향이 필요할 때 좋습니다." },
+            { name: "탕수육", note: "탕수육은 바삭한 식감이 있어 사이드가 아니라 메인으로도 충분합니다." },
+            { name: "양꼬치", note: "양꼬치는 향신료와 구운 고기 맛이 당길 때 잘 맞습니다." }
+          ]
+        },
+        {
+          id: "korean",
+          name: "한식",
+          label: "한식 슬롯머신",
+          menus: [
+            { name: "김치찌개", note: "김치찌개는 밥 한 공기와 가장 잘 맞는 뜨끈한 기본기 메뉴입니다." },
+            { name: "비빔밥", note: "비빔밥은 채소와 고추장 맛이 균형 있게 들어가 가볍게 든든합니다." },
+            { name: "제육볶음", note: "제육볶음은 매콤한 고기 반찬이 확실하게 당길 때 좋습니다." },
+            { name: "순두부찌개", note: "순두부찌개는 부드러운 식감과 얼큰한 국물이 같이 필요할 때 맞습니다." },
+            { name: "불고기", note: "불고기는 달큰한 양념 고기라 호불호가 적은 선택입니다." }
+          ]
+        },
+        {
+          id: "japanese",
+          name: "일식",
+          label: "일식 슬롯머신",
+          menus: [
+            { name: "초밥", note: "초밥은 깔끔하고 산뜻한 한 끼가 필요할 때 좋습니다." },
+            { name: "라멘", note: "라멘은 진한 국물과 면이 당기는 날에 잘 맞습니다." },
+            { name: "돈카츠", note: "돈카츠는 바삭한 튀김과 소스 조합으로 만족감이 큽니다." },
+            { name: "규동", note: "규동은 빠르고 든든하게 밥 메뉴를 먹고 싶을 때 좋습니다." },
+            { name: "우동", note: "우동은 부담 없이 따뜻한 국물과 면을 먹고 싶을 때 맞습니다." }
+          ]
+        },
+        {
+          id: "southeast",
+          name: "동남아",
+          label: "동남아 슬롯머신",
+          menus: [
+            { name: "쌀국수", note: "쌀국수는 맑고 따뜻한 국물로 부담 없이 먹기 좋은 메뉴입니다." },
+            { name: "팟타이", note: "팟타이는 새콤달콤한 볶음면이 당길 때 만족도가 높습니다." },
+            { name: "나시고렝", note: "나시고렝은 볶음밥처럼 든든하면서 이국적인 향이 살아 있습니다." },
+            { name: "반미", note: "반미는 바삭한 빵과 고기, 채소가 같이 들어가 가볍게 든든합니다." },
+            { name: "똠얌꿍", note: "똠얌꿍은 새콤하고 얼큰한 국물이 필요할 때 강한 선택입니다." }
+          ]
+        },
+        {
+          id: "mexican",
+          name: "멕시칸",
+          label: "멕시칸 슬롯머신",
+          menus: [
+            { name: "타코", note: "타코는 고기, 소스, 채소를 한입에 먹는 재미가 좋은 메뉴입니다." },
+            { name: "부리토", note: "부리토는 밥과 고기, 콩이 들어가 한 끼로 충분히 든든합니다." },
+            { name: "퀘사디아", note: "퀘사디아는 치즈와 또띠아의 고소함이 당길 때 잘 맞습니다." },
+            { name: "나초", note: "나초는 가볍게 나눠 먹거나 사이드처럼 즐기기 좋습니다." },
+            { name: "파히타", note: "파히타는 구운 고기와 채소를 직접 싸 먹는 맛이 있습니다." }
+          ]
+        },
+        {
+          id: "night",
+          name: "야식",
+          label: "야식 슬롯머신",
+          menus: [
+            { name: "치킨", note: "치킨은 바삭함과 짭짤함이 확실해서 야식 만족도가 높습니다." },
+            { name: "족발", note: "족발은 쫄깃한 식감과 푸짐함이 필요할 때 좋은 야식입니다." },
+            { name: "보쌈", note: "보쌈은 고기와 김치 조합이 깔끔해서 늦은 시간에도 부담이 덜합니다." },
+            { name: "곱창", note: "곱창은 고소한 맛과 구운 향이 강하게 당길 때 추천합니다." },
+            { name: "닭발", note: "닭발은 매운맛과 쫄깃한 식감이 필요한 밤에 잘 맞습니다." }
+          ]
+        },
+        {
+          id: "meat",
+          name: "고기",
+          label: "고기 슬롯머신",
+          menus: [
+            { name: "삼겹살", note: "삼겹살은 구운 고기와 쌈 조합으로 가장 직관적인 만족감을 줍니다." },
+            { name: "갈비", note: "갈비는 달큰한 양념과 고기 육즙이 같이 당길 때 좋습니다." },
+            { name: "닭갈비", note: "닭갈비는 매콤한 양념과 볶음밥 마무리까지 생각하면 강한 선택입니다." },
+            { name: "폭립", note: "폭립은 소스가 진하고 손으로 뜯어 먹는 재미가 있는 메뉴입니다." },
+            { name: "바베큐 플래터", note: "바베큐 플래터는 여러 고기를 한 번에 먹고 싶을 때 좋습니다." }
+          ]
+        }
       ];
-      const moods = ["오늘 저녁", "든든하게", "가볍게", "매콤하게", "친구랑", "배달로", "혼밥으로"];
       const toggle = document.getElementById("menuToggle");
       const panel = document.getElementById("menuPanel");
       const close = document.getElementById("menuClose");
-      const slots = [
-        document.getElementById("menuSlotA"),
-        document.getElementById("menuSlotB"),
-        document.getElementById("menuSlotC")
-      ];
+      const categorySlot = document.getElementById("menuCategorySlot");
+      const dishSlot = document.getElementById("menuDishSlot");
       const slotBoxes = [...panel.querySelectorAll(".menu-slot")];
       const result = document.getElementById("menuResult");
       const spinButton = document.getElementById("menuSpinButton");
@@ -2164,18 +2249,17 @@
 
       function recommendation() {
         const category = pick(categories);
-        return { category, menu: pick(category.menus), mood: pick(moods) };
+        return { category, menu: pick(category.menus) };
       }
 
       function setResult(rec) {
-        result.innerHTML = `<strong>${rec.category.name} - ${rec.menu}</strong>${rec.mood} 먹기 좋은 선택입니다. ${rec.category.note}`;
+        result.innerHTML = `<strong>${rec.category.name} - ${rec.menu.name}</strong>${rec.menu.note}`;
       }
 
       function quickRecommend() {
         const rec = recommendation();
-        slots[0].textContent = rec.category.name;
-        slots[1].textContent = rec.menu;
-        slots[2].textContent = rec.mood;
+        categorySlot.textContent = rec.category.name;
+        dishSlot.textContent = rec.menu.name;
         setResult(rec);
       }
 
@@ -2186,25 +2270,30 @@
         quickButton.disabled = true;
         slotBoxes.forEach(slot => slot.classList.add("spinning"));
 
-        const timers = slots.map((slot, index) => setInterval(() => {
-          const rec = recommendation();
-          slot.textContent = index === 0 ? rec.category.name : index === 1 ? rec.menu : rec.mood;
-        }, 70 + index * 20));
-
         const final = recommendation();
-        slots.forEach((slot, index) => {
-          setTimeout(() => {
-            clearInterval(timers[index]);
-            slotBoxes[index].classList.remove("spinning");
-            slot.textContent = index === 0 ? final.category.name : index === 1 ? final.menu : final.mood;
-            if (index === slots.length - 1) {
-              setResult(final);
-              spinning = false;
-              spinButton.disabled = false;
-              quickButton.disabled = false;
-            }
-          }, 850 + index * 460);
-        });
+        const categoryTimer = setInterval(() => {
+          categorySlot.textContent = pick(categories).name;
+        }, 70);
+        const dishTimer = setInterval(() => {
+          const currentCategory = categories.find(category => category.name === categorySlot.textContent) || final.category;
+          dishSlot.textContent = pick(currentCategory.menus).name;
+        }, 90);
+
+        setTimeout(() => {
+          clearInterval(categoryTimer);
+          slotBoxes[0].classList.remove("spinning");
+          categorySlot.textContent = final.category.name;
+        }, 950);
+
+        setTimeout(() => {
+          clearInterval(dishTimer);
+          slotBoxes[1].classList.remove("spinning");
+          dishSlot.textContent = final.menu.name;
+          setResult(final);
+          spinning = false;
+          spinButton.disabled = false;
+          quickButton.disabled = false;
+        }, 1550);
       }
 
       function setPanel(open) {
