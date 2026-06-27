@@ -762,7 +762,7 @@
 
   <button class="button contact-launcher utility-launcher" id="contactToggle" type="button" aria-controls="contactPanel" aria-expanded="false">문의하기</button>
   <button class="button comments-launcher utility-launcher" id="commentsToggle" type="button" aria-controls="commentsPanel" aria-expanded="false">댓글</button>
-  <button class="button menu-launcher utility-launcher" id="menuToggle" type="button" aria-controls="menuPanel" aria-expanded="false">메뉴 추천</button>
+  <a class="button menu-launcher utility-launcher" id="menuPageLink" href="menu.html">메뉴 추천</a>
 
   <aside class="contact-panel" id="contactPanel" aria-label="광고 및 제휴 문의" aria-hidden="true">
     <div class="contact-head">
@@ -806,7 +806,7 @@
     </div>
   </aside>
 
-  <aside class="menu-panel" id="menuPanel" aria-label="메뉴 추천" aria-hidden="true">
+  <aside class="menu-panel" id="menuPanel" aria-label="메뉴 추천" aria-hidden="true" hidden>
     <div class="menu-head">
       <div>
         <h2>메뉴 추천</h2>
@@ -2489,6 +2489,7 @@
       ];
       const toggle = document.getElementById("menuToggle");
       const panel = document.getElementById("menuPanel");
+      if (!toggle || !panel) return;
       const close = document.getElementById("menuClose");
       const categorySlot = document.getElementById("menuCategorySlot");
       const dishSlot = document.getElementById("menuDishSlot");
