@@ -853,6 +853,9 @@
       <div class="actions">
         <button class="button" id="startButton">게임 시작</button>
         <button class="button secondary" id="muteButton">소리 끄기</button>
+        <button class="button secondary" type="button" data-open-contact>문의하기</button>
+        <button class="button secondary" type="button" data-open-comments>댓글</button>
+        <a class="button secondary" href="menu.html">메뉴 추천</a>
       </div>
     </div>
   </section>
@@ -865,6 +868,9 @@
         <button class="button" id="continueButton" type="button">계속하기</button>
         <button class="button secondary" id="pauseMuteButton" type="button">소리 끄기</button>
         <button class="button secondary" id="mainMenuButton" type="button">시작메뉴로가기</button>
+        <button class="button secondary" type="button" data-open-contact>문의하기</button>
+        <button class="button secondary" type="button" data-open-comments>댓글</button>
+        <a class="button secondary" href="menu.html">메뉴 추천</a>
       </div>
     </div>
   </section>
@@ -2344,6 +2350,13 @@
         setPanel(!panel.classList.contains("open"));
       });
 
+      document.querySelectorAll("[data-open-contact]").forEach(button => {
+        button.addEventListener("click", event => {
+          event.stopPropagation();
+          setPanel(true);
+        });
+      });
+
       close.addEventListener("click", event => {
         event.stopPropagation();
         setPanel(false);
@@ -2667,6 +2680,13 @@
       toggle.addEventListener("click", event => {
         event.stopPropagation();
         setPanel(!panel.classList.contains("open"));
+      });
+
+      document.querySelectorAll("[data-open-comments]").forEach(button => {
+        button.addEventListener("click", event => {
+          event.stopPropagation();
+          setPanel(true);
+        });
       });
 
       close.addEventListener("click", event => {
