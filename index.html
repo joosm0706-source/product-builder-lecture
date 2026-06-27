@@ -188,7 +188,7 @@
         radial-gradient(circle at 50% 28%, rgba(236, 176, 79, .14), transparent 34%),
         rgba(5, 7, 9, .78);
       backdrop-filter: blur(6px);
-      z-index: 3;
+      z-index: 7;
     }
 
     .overlay[hidden] { display: none; }
@@ -627,12 +627,14 @@
     }
 
     @media (max-width: 720px) {
-      .hud { padding: 10px; }
+      .hud { padding: 7px; }
       .topbar, .bottombar { align-items: flex-start; }
-      .meters { width: min(100%, 48vw); }
-      .pill { font-size: 12px; min-height: 32px; padding: 6px 8px; }
+      .meters { width: min(100%, 42vw); gap: 4px; }
+      .meter { height: 8px; }
+      .cluster { gap: 4px; }
+      .pill { font-size: 10px; min-height: 26px; padding: 4px 6px; }
       .controls, .choices { grid-template-columns: 1fr; }
-      .choice { min-height: 102px; }
+      .choice { min-height: 88px; padding: 12px; }
       .contact-launcher {
         right: 10px;
         top: 70px;
@@ -670,6 +672,41 @@
       .touch-controls:not(.active) {
         display: none;
       }
+      .stick-base {
+        left: 18px;
+        bottom: 22px;
+        width: 96px;
+        height: 96px;
+      }
+      .stick-thumb {
+        left: 30px;
+        top: 30px;
+        width: 36px;
+        height: 36px;
+      }
+      .touch-actions {
+        right: 12px;
+        bottom: 16px;
+        grid-template-columns: repeat(2, 48px);
+        gap: 7px;
+      }
+      .touch-button {
+        width: 48px;
+        height: 48px;
+        font-size: 11px;
+      }
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .touch-controls,
+      .touch-controls.active {
+        display: none !important;
+      }
+    }
+
+    body.level-selecting .touch-controls {
+      display: none !important;
+      pointer-events: none !important;
     }
   </style>
 </head>
@@ -918,6 +955,8 @@
 
       const mouseSensitivity = .0012;
       const dragSensitivity = .002;
+      const touchLookSensitivity = .007;
+      const mobileControlQuery = window.matchMedia("(max-width: 900px) and (hover: none) and (pointer: coarse)");
       const weapons = {
         pistol: { name: "룬 피스톨", damage: 28, fireRate: 185, ammo: 12, reloadMs: 860, pellets: 1, spread: .025, shake: 5, pitch: 520 },
         shotgun: { name: "성채 샷건", damage: 14, fireRate: 620, ammo: 5, reloadMs: 1080, pellets: 7, spread: .17, shake: 11, pitch: 260 },
@@ -1003,8 +1042,9 @@
       }
 
       function setTouchControlsVisible(visible) {
-        document.getElementById("touchControls")?.classList.toggle("active", visible);
-        if (!visible) {
+        const shouldShow = visible && mobileControlQuery.matches;
+        document.getElementById("touchControls")?.classList.toggle("active", shouldShow);
+        if (!shouldShow) {
           touch.moveId = null;
           touch.lookId = null;
           touch.moveX = 0;
@@ -1016,7 +1056,7 @@
 
       function updateStick(x, y) {
         const thumb = document.getElementById("stickThumb");
-        if (thumb) thumb.style.transform = `translate(${x * 37}px, ${y * 37}px)`;
+        if (thumb) thumb.style.transform = `translate(${x * 30}px, ${y * 30}px)`;
       }
 
       const generalUpgrades = [
@@ -1441,7 +1481,9 @@
         player.health = Math.min(player.maxHealth, player.health + 20);
         player.mana = player.maxMana;
         pausedForLevel = true;
+        document.body.classList.add("level-selecting");
         document.exitPointerLock?.();
+        setTouchControlsVisible(false);
         setUtilityButtonsVisible(true);
         const shuffled = buildUpgradeChoices();
         ui.choices.innerHTML = "";
@@ -1453,7 +1495,9 @@
             up.apply();
             ui.levelOverlay.hidden = true;
             pausedForLevel = false;
+            document.body.classList.remove("level-selecting");
             setUtilityButtonsVisible(false);
+            setTouchControlsVisible(true);
             nextWave();
             canvas.requestPointerLock?.();
           });
@@ -1526,6 +1570,7 @@
         damageNumbers.length = 0;
         gameOver = false;
         pausedForLevel = false;
+        document.body.classList.remove("level-selecting");
         ui.levelOverlay.hidden = true;
         spawnWave();
       }
@@ -2208,7 +2253,7 @@
       lookZone.addEventListener("pointermove", event => {
         if (event.pointerId !== touch.lookId || !running || pausedForLevel) return;
         const dx = event.clientX - touch.lookLastX;
-        player.angle = normalizeAngle(player.angle + dx * .0042);
+        player.angle = normalizeAngle(player.angle + dx * touchLookSensitivity);
         touch.lookLastX = event.clientX;
         event.preventDefault();
       });
