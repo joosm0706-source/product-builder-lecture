@@ -760,10 +760,6 @@
     </div>
   </div>
 
-  <button class="button contact-launcher utility-launcher" id="contactToggle" type="button" aria-controls="contactPanel" aria-expanded="false">문의하기</button>
-  <button class="button comments-launcher utility-launcher" id="commentsToggle" type="button" aria-controls="commentsPanel" aria-expanded="false">댓글</button>
-  <a class="button menu-launcher utility-launcher" id="menuPageLink" href="menu.html">메뉴 추천</a>
-
   <aside class="contact-panel" id="contactPanel" aria-label="광고 및 제휴 문의" aria-hidden="true">
     <div class="contact-head">
       <div>
@@ -2331,12 +2327,12 @@
         }
         panel.classList.toggle("open", open);
         panel.setAttribute("aria-hidden", String(!open));
-        toggle.setAttribute("aria-expanded", String(open));
+        toggle?.setAttribute("aria-expanded", String(open));
         if (open) {
           document.exitPointerLock?.();
           form.querySelector("input, textarea")?.focus();
         } else {
-          toggle.focus();
+          document.querySelector("[data-open-contact]")?.focus();
         }
       }
 
@@ -2345,7 +2341,7 @@
         status.className = `contact-status ${type}`.trim();
       }
 
-      toggle.addEventListener("click", event => {
+      toggle?.addEventListener("click", event => {
         event.stopPropagation();
         setPanel(!panel.classList.contains("open"));
       });
@@ -2587,15 +2583,15 @@
         }
         panel.classList.toggle("open", open);
         panel.setAttribute("aria-hidden", String(!open));
-        toggle.setAttribute("aria-expanded", String(open));
+        toggle?.setAttribute("aria-expanded", String(open));
         if (open) {
           document.exitPointerLock?.();
         } else {
-          toggle.focus();
+          document.querySelector("[data-open-comments]")?.focus();
         }
       }
 
-      toggle.addEventListener("click", event => {
+      toggle?.addEventListener("click", event => {
         event.stopPropagation();
         setPanel(!panel.classList.contains("open"));
       });
@@ -2668,16 +2664,16 @@
         }
         panel.classList.toggle("open", open);
         panel.setAttribute("aria-hidden", String(!open));
-        toggle.setAttribute("aria-expanded", String(open));
+        toggle?.setAttribute("aria-expanded", String(open));
         if (open) {
           document.exitPointerLock?.();
           loadDisqus();
         } else {
-          toggle.focus();
+          document.querySelector("[data-open-comments]")?.focus();
         }
       }
 
-      toggle.addEventListener("click", event => {
+      toggle?.addEventListener("click", event => {
         event.stopPropagation();
         setPanel(!panel.classList.contains("open"));
       });
