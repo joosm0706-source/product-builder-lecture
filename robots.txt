@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://joosm0706-source.github.io/product-builder-lecture/sitemap.xml
