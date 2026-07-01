@@ -7,6 +7,13 @@ if (!document.querySelector('link[href="arcade.css"]')) {
   document.head.appendChild(styles);
 }
 
+if (!document.querySelector('link[href="new-games.css"]')) {
+  const gameStyles = document.createElement('link');
+  gameStyles.rel = 'stylesheet';
+  gameStyles.href = 'new-games.css';
+  document.head.appendChild(gameStyles);
+}
+
 document.querySelectorAll('.brand').forEach(brand => {
   brand.innerHTML = '게임<span>세상</span>';
   brand.setAttribute('aria-label', '게임세상 홈');
@@ -37,12 +44,12 @@ document.querySelectorAll('.nav-links').forEach(nav => {
   });
 });
 
-const fullscreenTarget = document.querySelector('.game-wrap, .blocks-stage');
+const fullscreenTarget = document.querySelector('.game-wrap, .blocks-stage, .mines-frame');
 if (fullscreenTarget) {
   const fullscreenStyles = document.createElement('style');
   fullscreenStyles.textContent = `
     .fullscreen-button{position:absolute;right:14px;bottom:14px;z-index:12;min-height:38px;padding:0 12px;background:rgba(8,12,17,.88)!important;color:var(--text)!important}
-    .game-wrap:fullscreen,.blocks-stage:fullscreen{width:100vw;height:100vh;max-width:none;max-height:none;border:0;border-radius:0;background:#070b12}
+    .game-wrap:fullscreen,.blocks-stage:fullscreen,.mines-frame:fullscreen{width:100vw;height:100vh;max-width:none;max-height:none;border:0;border-radius:0;background:#070b12}
     .game-wrap:fullscreen canvas,.blocks-stage:fullscreen canvas{width:100%;height:100%;object-fit:contain}
   `;
   document.head.appendChild(fullscreenStyles);
