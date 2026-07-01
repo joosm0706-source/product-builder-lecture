@@ -14,6 +14,13 @@ if (!document.querySelector('link[href="new-games.css"]')) {
   document.head.appendChild(gameStyles);
 }
 
+if (!document.querySelector('link[href="rank-system.css"]')) {
+  const rankStyles = document.createElement('link');
+  rankStyles.rel = 'stylesheet';
+  rankStyles.href = 'rank-system.css';
+  document.head.appendChild(rankStyles);
+}
+
 document.querySelectorAll('.brand').forEach(brand => {
   brand.innerHTML = '게임<span>세상</span>';
   brand.setAttribute('aria-label', '게임세상 홈');
